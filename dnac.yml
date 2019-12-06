@@ -1,0 +1,20 @@
+---
+
+#
+# Access to Cisco DNA Center REST API
+#
+# 2019/12/02
+# Takamitsu IIDA (@takamitsu-iida)
+
+- name: access to cisco dna center rest api
+  hosts: sandboxdnac2
+  gather_facts: False
+
+  tasks:
+
+    - name: get token
+      dnac_token:
+      register: r
+
+    - debug:
+        var: r

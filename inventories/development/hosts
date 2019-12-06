@@ -1,0 +1,6 @@
+#
+# development
+#
+
+[devnet]
+sandboxdnac2 ansible_host=sandboxdnac2.cisco.com
