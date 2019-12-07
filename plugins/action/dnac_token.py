@@ -13,6 +13,7 @@ import time
 from ansible.plugins.action.normal import ActionModule as _ActionModule
 
 # import from collection
+# ansible 2.9 or later
 from ansible_collections.iida.dnac.plugins.module_utils.dnac import DnacRestClient
 
 try:
@@ -69,7 +70,10 @@ class ActionModule(_ActionModule):
     password = hostvars.get('password') or hostvars.get('ansible_ssh_pass') or hostvars.get('ansible_password') or hostvars.get('ansible_pass') # ansible_pass is wrong setting
     timeout = hostvars.get('timeout')
     http_proxy = hostvars.get('http_proxy')
-    log_dir = hostvars.get('log_dir') or self.get_working_path()
+    log_dir = hostvars.get('log_dir')
+    if not log_dir:
+      cwd = self.get_working_path()
+      log_dir = os.path.join(cwd, 'log')
 
     # debug
     # display.vvv(remote_addr)
@@ -98,7 +102,6 @@ class ActionModule(_ActionModule):
     if not self._task.args.get('http_proxy') and http_proxy:
       self._task.args['http_proxy'] = http_proxy
 
-    # log_dir はデフォルトとしてカレントディレクトリを使う
     if not self._task.args.get('log_dir'):
       self._task.args['log_dir'] = log_dir
 

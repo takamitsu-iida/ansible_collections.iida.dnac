@@ -2,23 +2,53 @@
 
 Cisco DNA CenterをREST APIで操作するAnsibleコレクションです。
 
-REST APIクライアントを簡易的にPythonで実装することが多いと思います。
-それをansibleで実行するためのコレクションです。
-
 ## Requirements
 
-- Ansible 2.9
+- Ansible 2.9 or later
 - Cisco Intent API 1.2
 
-## 作戦
+## Install/Uninstall
 
-1. トークンを取得するモジュール（アクションプラグイン）を呼び出します
+~/.ansible/collections/ansible_collections/ にインストールします。
+
+```bash
+make build
+make install
+```
+
+アンインストールはコレクションを消すだけです。
+
+```bash
+make uninstall
+```
+
+## プレイブックの流れ
+
+1. トークンを取得するモジュールを実行します
 1. 結果をregisterで格納します
 1. registerからトークンの文字列を取り出します
 1. そのトークンを次のモジュールの引数として利用します
 
-ターゲットノードに乗り込んで処理を実行するわけではないので、localhost上で実行するactionプラグインを中心に実装します。
-
 ## 認証トークンについて
 
-REST APIの利用に伴う認証にJWT形式のトークンを返してくる場合を想定します。
+Cisco DNA CenterのREST APIではJWT形式の認証トークンを返してきます。
+
+認証トークンはプレイブックを実行した場所にlogフォルダを作成して、そこにファイルとしてキャッシュします。
+
+## 実装について
+
+ターゲットノードに乗り込んで処理を実行するわけではないので、localhost上で実行するactionプラグインを中心に実装します。
+
+## 参考
+
+- Cisco DNA Centerのマニュアル
+
+<https://developer.cisco.com/docs/dna-center/#!cisco-dna-center-v-1-2-6-and-later/authentication>
+
+- Using Collections
+
+<https://docs.ansible.com/ansible/latest/user_guide/collections_using.html>
+
+- Developing Collections
+
+<https://docs.ansible.com/ansible/latest/dev_guide/developing_collections.html>
