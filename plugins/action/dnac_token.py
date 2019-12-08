@@ -123,7 +123,7 @@ class ActionModule(_ActionModule):
 
     drc = DnacRestClient(self._task.args)
 
-    token = drc.getToken()
+    token = drc.get_token()
 
     if token:
       result['token'] = token

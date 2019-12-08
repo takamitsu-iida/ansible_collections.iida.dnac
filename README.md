@@ -9,11 +9,22 @@ Cisco DNA CenterをREST APIで操作するAnsibleコレクションです。
 
 ## Install/Uninstall
 
+このレポジトリをクローンしてください。
+
+```bash
+git clone https://github.com/takamitsu-iida/ansible_collections.iida.dnac.git
+```
+
 ~/.ansible/collections/ansible_collections/ にインストールします。
 
 ```bash
-make build
 make install
+```
+
+インターネット上のサンドボックスを使ってテスト実行できます。
+
+```bash
+make play
 ```
 
 アンインストールはコレクションを消すだけです。
@@ -34,6 +45,16 @@ make uninstall
 Cisco DNA CenterのREST APIではJWT形式の認証トークンを返してきます。
 
 認証トークンはプレイブックを実行した場所にlogフォルダを作成して、そこにファイルとしてキャッシュします。
+
+```bash
+log
+├── dnac.lock
+└── dnac.pickle
+```
+
+dnac.locはロックファイルです。中身は空っぽです。複数のプロセスが同時に走ったときのための保護に使っています。
+
+dnac.pickleはトークンのキャッシュです。一度認証したら、有効期限が切れるまではこのキャッシュを使います。
 
 ## 実装について
 

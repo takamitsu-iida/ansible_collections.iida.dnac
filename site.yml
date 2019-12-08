@@ -3,7 +3,7 @@
 #
 # Access to Cisco DNA Center REST API
 #
-# 2019/12/02
+# 2019/12/07
 # Takamitsu IIDA (@takamitsu-iida)
 
 - name: access to cisco dna center rest api
@@ -12,7 +12,7 @@
 
   tasks:
 
-    - name: get token
+    - name: get auth token
       iida.dnac.dnac_token:
       register: r
 
