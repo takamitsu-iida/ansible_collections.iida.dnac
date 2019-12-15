@@ -3,4 +3,13 @@
 #
 
 [devnet]
+
+#
+# SANDBOX LABS
+# https://devnetsandbox.cisco.com/RM/Topology
+#
+sandboxdnac ansible_host=sandboxdnac.cisco.com
 sandboxdnac2 ansible_host=sandboxdnac2.cisco.com
+
+# reservation lab
+dna_center_a ansible_host=10.10.20.85

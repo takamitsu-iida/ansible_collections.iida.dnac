@@ -66,10 +66,21 @@ dnac.pickleはトークンのキャッシュです。一度認証したら、有
 
 <https://developer.cisco.com/docs/dna-center/#!cisco-dna-center-v-1-2-6-and-later/authentication>
 
-- Using Collections
+<https://developer.cisco.com/site/dna-center-rest-api/>
+
+Cisco DNA-Cの使い方自体はユーザガイドを見ること。
+
+- Cisco DevNet Sandbox
+
+常時稼働のものと予約して使うものがある。
+
+<https://developer.cisco.com/docs/dna-center/#!sandboxes/cisco-dna-center-sandboxes>
+<https://developer.cisco.com/site/sandbox/>
+
+- Ansible Using Collections
 
 <https://docs.ansible.com/ansible/latest/user_guide/collections_using.html>
 
-- Developing Collections
+- Ansible Developing Collections
 
 <https://docs.ansible.com/ansible/latest/dev_guide/developing_collections.html>

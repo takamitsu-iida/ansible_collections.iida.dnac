@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# pylint: disable=too-many-lines
 
 """Cisco DNA-C REST API Client.
 
@@ -15,6 +16,7 @@
 import datetime  # token expire date
 import fcntl  # process exclusion cotrol
 import functools  # decorator
+import time
 import json
 import logging
 import os
@@ -43,8 +45,12 @@ class DnacRestClient(object):
   """
   # pylint: disable=too-many-instance-attributes,too-many-public-methods
 
-  API_PATH_TOKEN = '/dna/system/api/v1/auth/token'
-  API_PATH_GROUP = '/api/v1/group'
+  API_PATH_TOKEN = '/dna/system/api/v1/auth/token'  # Cisco DNA Center version 1.2.6 and above
+
+  # wait until completion of async operation with these interval and count
+  RETRY_INTERVAL = 2
+  MAX_RETRY_COUNT = 10
+
 
   def __init__(self, params):
     """constructor for DnacRestClient class
@@ -52,6 +58,7 @@ class DnacRestClient(object):
     expected key of params
       - check_mode
       - host
+      - port
       - username
       - password
       - timeout
@@ -88,20 +95,21 @@ class DnacRestClient(object):
       with open(self.lock_path, 'w', encoding='UTF-8'):
         pass
 
-    # check_mode or not
+    # is check_mode or not, default is False
     self._check_mode = params.get('check_mode', False)
 
-    # target hostname or ip addr
+    # target hostname fqdn or ip addr, port
     self._host = params.get('host')
+    self._port = params.get('port', 443)
 
     # username and password
     self._username = params.get('username', '')
     self._password = params.get('password', '')
 
-    # timeout
+    # timeout used in requests module, default is 30 sec
     self._timeout = params.get('timeout', 30)
 
-    # http proxy
+    # http proxy, http://username:password@proxy-server-fqdn:8080
     http_proxy = params.get('http_proxy')
     if http_proxy:
       self._proxies = {
@@ -110,6 +118,62 @@ class DnacRestClient(object):
       }
     else:
       self._proxies = None
+
+    # on memory cache for async operation
+    # async operation repeats get method until process end
+    self._token = ''
+
+  #
+  # getter/setter
+  #
+  def check_mode(self, *_):
+    """get/set _check_mode"""
+    if not _:
+      return self._check_mode
+    self._check_mode = _[0]
+    return self
+
+  def host(self, *_):
+    """get/set _host"""
+    if not _:
+      return self._host
+    self._host = _[0]
+    return self
+
+  def port(self, *_):
+    """get/set _port"""
+    if not _:
+      return self._port
+    self._port = _[0]
+    return self
+
+  def username(self, *_):
+    """get/set _username"""
+    if not _:
+      return self._username
+    self._username = _[0]
+    return self
+
+  def password(self, *_):
+    """get/set _password"""
+    if not _:
+      return self._password
+    self._password = _[0]
+    return self
+
+  def timeout(self, *_):
+    """get/set _timeout in second"""
+    if not _:
+      return self._timeout
+    self._timeout = _[0]
+    return self
+
+  def proxies(self, *_):
+    """get/set _proxies"""
+    if not _:
+      return self._proxies
+    self._proxies = _[0]
+    return self
 
 
   def save_token(self, token):
@@ -130,6 +194,7 @@ class DnacRestClient(object):
     if data:
       if not token:
         # remove it
+        self._token = ''
         if key in data:
           data.pop(key)
       else:
@@ -202,7 +267,6 @@ class DnacRestClient(object):
     # convert to datetime object
     expires_at = datetime.datetime.fromtimestamp(expires_at_str, datetime.timezone.utc)
 
-    # dirty hack
     # in case of time difference, -5 min
     expires_at -= datetime.timedelta(minutes=5)
 
@@ -213,8 +277,12 @@ class DnacRestClient(object):
 
 
   def get_token(self):
-    """get token with thread safe
+    """get token thread safe
     """
+    # memory cache
+    if self._token:
+      return self._token
+
     with open(self.lock_path) as lock_file:
       # block until lock file
       fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
@@ -292,6 +360,7 @@ class DnacRestClient(object):
     auth = (self._username, self._password)
 
     api_path = self._normalize_api_path(self.API_PATH_TOKEN)
+    # authentication use https port 443
     url = 'https://{}/{}'.format(self._host, api_path)
 
     result = {
@@ -375,7 +444,6 @@ class DnacRestClient(object):
     return payload
 
 
-  # define decorator
   def set_token():
     """decorator for GET/POST/PUT/DELETE operation
 
@@ -422,8 +490,8 @@ class DnacRestClient(object):
         #
         # PROCESS
         #
+        r = None
         try:
-          msg = ''
           r = wrapped_function(self, *args, headers=headers, timeout=timeout, proxies=proxies, verify=False, **kwargs)
         except requests.exceptions.ProxyError as e:
           result['msg'] = "requests.exceptions.ProxyError occured"
@@ -452,17 +520,20 @@ class DnacRestClient(object):
           return result
 
         result['status_code'] = r.status_code
+        logging.info("%s %s", r.status_code, r.url)
 
-        # remove token if authentication error
+        # remove token in cache if authentication error
         if r.status_code == 401:
           self.save_token(None)
-          result['msg'] = "authentication error?"
+          result['msg'] = "authentication error"
           result['original_message'] = r.json()
           return result
 
-        logging.info("%s %s", r.status_code, r.url)
-
-        result['data'] = r.json()
+        content_type = r.headers.get('Content-Type', '')
+        if content_type.find("json") >= 0:
+          result['data'] = r.json()
+        else:
+          result['data'] = r.text
 
         # success
         if r.ok:
@@ -474,9 +545,10 @@ class DnacRestClient(object):
     return _outer_wrapper
   #
 
-
-  def _normalize_api_path(self, api_path):
+  @staticmethod
+  def _normalize_api_path(api_path):
     return api_path.strip('/')
+
 
   @set_token()
   def get(self, api_path='', params=None, **kwargs):
@@ -486,7 +558,7 @@ class DnacRestClient(object):
       return None
 
     api_path = self._normalize_api_path(api_path)
-    url = 'https://{}/{}'.format(self._host, api_path)
+    url = 'https://{}:{}/{}'.format(self._host, self._port, api_path)
 
     logging.info("GET %s", url)
     return requests.get(url, params=params, **kwargs)
@@ -500,7 +572,7 @@ class DnacRestClient(object):
       return None
 
     api_path = self._normalize_api_path(api_path)
-    url = 'https://{}/{}'.format(self._host, api_path)
+    url = 'https://{}:{}/{}'.format(self._host, self._port, api_path)
 
     logging.info("POST %s", url)
     return requests.post(url, json.dumps(data), **kwargs)
@@ -514,7 +586,7 @@ class DnacRestClient(object):
       return None
 
     api_path = self._normalize_api_path(api_path)
-    url = 'https://{}/{}'.format(self._host, api_path)
+    url = 'https://{}:{}/{}'.format(self._host, self._port, api_path)
 
     logging.info("PUT %s", url)
     return requests.put(url, json.dumps(data), **kwargs)
@@ -528,10 +600,54 @@ class DnacRestClient(object):
       return None
 
     api_path = self._normalize_api_path(api_path)
-    url = 'https://{}/{}'.format(self._host, api_path)
+    url = 'https://{}:{}/{}'.format(self._host, self._port, api_path)
 
     logging.info("DELETE %s", url)
     return requests.delete(url, **kwargs)
+
+
+  def wait_for_task(self, task_id):
+    """wait for completion of specified task_id
+    """
+    timeout = self.RETRY_INTERVAL * self.MAX_RETRY_COUNT
+    interval = self.RETRY_INTERVAL
+
+    api_path = '/dna/intent/api/v1/task/{}'.format(task_id)
+
+    result = {
+      'failed': True,
+      'msg': '',
+      'response': None
+    }
+
+    start_time = time.time()
+
+    while True:
+      r = self.get(api_path=api_path)
+      if not r:
+        return result
+
+      data = r.get('data')
+      response = data.get('response')
+      # print(json.dumps(response, ensure_ascii=False, indent=2))
+
+      if 'endTime' in response:
+        result['failed'] = False
+        return response
+
+      if start_time + timeout < time.time():
+        result['msg'] = "task_id {} did not end within the specified timeout ({} sec)".format(task_id, timeout)
+        return result
+
+      logging.info("task_id %s has not completed yet. Sleeping %s seconds...", task_id, interval)
+      time.sleep(interval)
+
+      if response.get('isError', False) is True:
+        result['msg'] = "task_id {} is error".format(task_id)
+        result['original_message'] = response.get('progress')
+        return result
+
+    return response
 
 
   def create_object(self, api_path='', data=None):
@@ -543,46 +659,93 @@ class DnacRestClient(object):
     """
 
     result = {
-      'changed': False,
-      'failed': False,
-      'msg': ''
+      'failed': True,
+      'changed': False
     }
 
     if self._check_mode:
-      result['msg'] = 'did nothing because of check mode'
       result['failed'] = False
+      result['msg'] = 'did nothing because of check mode'
       return result
 
-    if not data or not isinstance(data, dict):
-      result['msg'] = 'data should be dict object'
-      result['failed'] = True
+    post_result = self.post(api_path=api_path, data=data)
+
+    if not post_result:
+      result['msg'] = 'failed before requests.post()'
       return result
 
-    r = self.post(api_path=api_path, data=data)
+    # https://developer.cisco.com/docs/dna-center/#!getting-information-about-asynchronous-operations/getting-information-about-asynchronous-operations
+    # When DNA Center Platform returns a 202 (Accepted) HTTP status code,
+    # the result body includes a task ID and a URL that you can use to query
+    # for more information about the asynchronous task that your original
+    # request spawned. For example, you can use this information to
+    # determine whether a lengthy task has completed.
+    # {
+    #     "response": {
+    #         "taskId": "85c95140-50fc-4a57-994d-db58d3afe6b3",
+    #         "url": "dna/intent/api/v1/task/85c95140-50fc-4a57-994d-db58d3afe6b3"
+    #     },
+    #     "version": "1.0"
+    # }
 
-    if not r:
-      result['msg'] = 'failed before requests.get()'
-      result['failed'] = True
-      return result
+    if __name__ == '__main__':
+      print(json.dumps(post_result, ensure_ascii=False, indent=2))
 
-    if r.status_code in [200, 201]:
-      # success
+    data = post_result.get('data')
 
-      data = r.get('data')
-      if url.find('intent') >= 0:
-        task_response = self.intent_task_checker(r['executionId'])
-      else:
-        task_response = self.task_checker(r['response']['taskId'])
-
-
-    elif r.status_code == 202:
-      # async operation
-
-
+    if post_result.get('status_code', -1) in [200, 201, 204, 206]:
+      # successfuly ended
+      result['changed'] = True
+      result.update(post_result)
+    elif post_result.get('status_code', -1) == 202:
+      # successfully ended but async operation is needed
+      response = data.get('response')
+      task_id = response.get('taskId')
+      wait_result = self.wait_for_task(task_id)
+      result.update(wait_result)
+      result['changed'] = not wait_result.get('failed')
     else:
-      result['changed'] = False
-      result['failed'] = True
-      result['original_message'] = r.get('original_message')
+      result.update(post_result)
+
+    return result
+
+
+  def delete_object(self, api_path=''):
+    """[summary]
+
+    Keyword Arguments:
+        api_path {str} -- [description] (default: {''})
+        data {dict} -- [description] (default: {None})
+    """
+
+    result = {
+      'failed': True,
+      'changed': False
+    }
+
+    if self._check_mode:
+      result['failed'] = False
+      result['msg'] = 'did nothing because of check mode'
+      return result
+
+    delete_result = self.delete(api_path=api_path)
+
+    data = delete_result.get('data')
+
+    if delete_result.get('status_code', -1) in [200, 201, 204, 206]:
+      # successfuly ended
+      result['changed'] = True
+      result.update(delete_result)
+    elif delete_result.get('status_code', -1) == 202:
+      # successfully ended but async operation is needed
+      response = data.get('response')
+      task_id = response.get('taskId')
+      wait_result = self.wait_for_task(task_id)
+      result.update(wait_result)
+      result['changed'] = not wait_result.get('failed')
+    else:
+      # fail
+      result.update(delete_result)
 
     return result
 
@@ -591,6 +754,8 @@ class DnacRestClient(object):
   def get_group_id_by_name(self, group_name):
     """lookup group id
 
+    '/api/v1/group'
+
     Arguments:
         group_name {str} -- group name
 
@@ -598,12 +763,16 @@ class DnacRestClient(object):
         str -- group id
     """
 
+    if not group_name:
+      return '-1'
+
     if group_name.lower() == 'global':
       return '-1'
 
-    api_path = self.API_PATH_GROUP
+    api_path = '/api/v1/group'
+
     result = self.get(api_path)
-    if not result or result.get('failed'):
+    if not result or result.get('failed', True):
       return '-1'
 
     data = result.get('data')
@@ -621,19 +790,60 @@ class DnacRestClient(object):
 
     return '-1'
 
+
+  def get_site_names(self):
+    """get all site name
+
+    VERSION 1.3
+    '/dna/intent/api/v1/site'
+
+    Returns:
+        list -- list of all group name
+    """
+    _cache = {}
+
+    api_path = '/dna/intent/api/v1/site/count'
+    get_result = self.get(api_path)
+    if not get_result or get_result.get('failed'):
+      return {}
+
+    data = get_result.get('data')
+    count = data.get('response')
+
+    STEP = 10
+    for start in range(1, count + 1, STEP):
+      api_path = '/dna/intent/api/v1/site?offset={}&limit={}'.format(start, STEP)
+      get_result = self.get(api_path=api_path)
+      if not get_result or get_result.get('failed'):
+        return {}
+      data = get_result.get('data')
+      sites = data.get('response')
+      for site in sites:
+        logging.info("Caching %s", site['groupNameHierarchy'])
+        _cache[site['groupNameHierarchy']] = site
+
+    # add Global
+    _cache['Global'] = {'groupNameHierarchy': 'Global', 'additionalInfo': [{'attributes': {'type': 'area'}}]}
+
+    return _cache
+
+
   def get_group_names(self):
     """get all group name
+
+    VERSION 1.2
+    '/api/v1/group'
 
     Returns:
         list -- list of all group name
     """
 
-    api_path = self.API_PATH_GROUP
-    result = self.get(api_path)
-    if not result or result.get('failed'):
+    api_path = '/api/v1/group'
+    get_result = self.get(api_path)
+    if not get_result or get_result.get('failed'):
       return []
 
-    data = result.get('data')
+    data = get_result.get('data')
     #   "data": {
     #     "response": [
     #       {
@@ -645,12 +855,12 @@ class DnacRestClient(object):
     return group_names
 
 
-  def process_common_settings(self, payload, group_id):
+  def process_common_settings(self, api_path, state, want_settings):
     """[summary]
 
     Arguments:
-        payload {list} -- list of params dict
-        group_id {str} -- group_id uuid
+        want_settings {list} -- list of desired params dict
+        state {str} -- desired state, present or absent
     """
 
     result = {
@@ -658,86 +868,164 @@ class DnacRestClient(object):
       'changed': False
     }
 
-    if group_id:
-      payload[0].update({'groupUuid': group_id})
-    else:
-      result['original_message'] = group_id
-      result['msg'] = "Failed to locate groupUuid"
-      return result
+    # get current settings
+    requests_result = self.get(api_path=api_path)
+    data = requests_result.get('data')
+    have_settings = data.get('response')
+    have_settings_count = len(have_settings)
 
-    # Define local variables
-    state = self.module.params['state']
+    # debug
+    if __name__ == '__main__':
+      print(json.dumps(have_settings, ensure_ascii=False, indent=2))
 
-    # Get current settings
-    settings = self.get_obj()
-    settings = settings['response']
-    setting_count = len(settings)
+    # for debug purpose
+    result['have'] = have_settings
+    result['want'] = want_settings
 
-    # Save the existing and proposed datasets
-    self.result['previous'] = settings
-    self.result['proprosed'] = payload
+    if state == 'present' and have_settings_count == 1:
+      # have exist
+      # compare have and want
+      if have_settings[0]['value'] == want_settings[0]['value']:
+        result['failed'] = False
+        result['msg'] = 'already in desired state'
+      else:
+        create_result = self.create_object(api_path=api_path, data=want_settings)
+        if create_result:
+          result.update(create_result)
 
-    if state == 'present':
-      if setting_count == 1:
-        # compare previous to proposed
-        if settings[0]['value'] != payload[0]['value']:
-          self.create_obj(payload)
-        else:
-          self.result['changed'] = False
-          self.result['msg'] = 'Already in desired state.'
-          self.module.exit_json(**self.result)
-      elif setting_count == 0:
-        # create the object
-        self.create_obj(payload)
+    elif state == 'present' and have_settings_count == 0:
+      # create new
+      create_result = self.create_object(api_path=api_path, data=want_settings)
+      if create_result:
+        result.update(create_result)
 
     elif state == 'absent':
-      payload[0].update({'value': []})
-      self.create_obj(payload)
+      want_settings[0].update({'value': []})
+      create_result = self.create_object(api_path=api_path, data=want_settings)
+      if create_result:
+        result.update(create_result)
 
-  #
-  # getter/setter
-  #
-  def check_mode(self, *_):
-    """get/set _check_mode"""
-    if not _:
-      return self._check_mode
-    self._check_mode = _[0]
-    return self
+    return result
 
-  def host(self, *_):
-    """get/set _host"""
-    if not _:
-      return self._host
-    self._host = _[0]
-    return self
 
-  def username(self, *_):
-    """get/set _username"""
-    if not _:
-      return self._username
-    self._username = _[0]
-    return self
+  def process_banner(self, state='present', banner_message='', group_name='Global', retain_banner=True):
+    """create banner in dna-c
 
-  def password(self, *_):
-    """get/set _password"""
-    if not _:
-      return self._password
-    self._password = _[0]
-    return self
+    data structure
+    [
+      {
+        "instanceType": "banner",
+        "instanceUuid": "9f904f59-f2d1-4ab0-b1ba-abcd1eb1e5fd",
+        "namespace": "global",
+        "type": "banner.setting",
+        "key": "device.banner",
+        "version": 14,
+        "value": [
+          {
+            "bannerMessage": "Test motd banner",
+            "retainExistingBanner": false
+          }
+        ],
+        "groupUuid": "7e0c9368-97a6-41f8-9e2c-d523e007d295",
+        "inheritedGroupUuid": "-1",
+        "inheritedGroupName": "Global"
+      }
+    ]
 
-  def timeout(self, *_):
-    """get/set _timeout in second"""
-    if not _:
-      return self._timeout
-    self._timeout = _[0]
-    return self
+    Keyword Arguments:
+        state {str} -- state provides the action to be executed, present or absent (default: {'present'})
+        banner_message {str} -- banner message (default: {''})
+        group_name {str} -- name of the group in the hierarchy (default: {'Global'})
+        retain_banner {bool} -- overwrite existing banner or not (default: {True})
+    """
 
-  def proxies(self, *_):
-    """get/set _proxies"""
-    if not _:
-      return self._proxies
-    self._proxies = _[0]
-    return self
+    # convert group name to id
+    group_id = self.get_group_id_by_name(group_name)
+
+    payload = [{
+      'instanceType': "banner",
+      'namespace': "global",
+      'type': "banner.setting",
+      'key': "device.banner",
+      'value': [{
+        'bannerMessage': banner_message,
+        'retainExistingBanner': retain_banner
+      }],
+      'groupUuid': group_id
+    }]
+
+    api_path = '/api/v1/commonsetting/global/{}?key=device.banner'.format(group_id)
+    api_path = self._normalize_api_path(api_path)
+
+    return self.process_common_settings(api_path, state, payload)
+
+
+  def process_group(self, state='present', group_name='', group_type='area', parent_name='Global', building_info=None):
+    """[summary]
+
+    '/api/v1/group'
+
+    group_type is a choice of "area" "building" "floor"
+
+    Keyword Arguments:
+        state {str} -- [description] (default: {'present'})
+        group_name {str} -- [description] (default: {''})
+        group_type {str} -- [description] (default: {'area'})
+        parent_name {str} -- [description] (default: {'Global'})
+        building_info {dict} -- [description] (default: {None})
+    """
+    result = {
+      'failed': True,
+      'changed': False
+    }
+
+    payload = {
+      'groupTypeList': ["SITE"],
+      'name': group_name,
+      'additionalInfo': [
+        {
+          'nameSpace': "Location",
+          'attributes': {'type': group_type},
+        }]
+    }
+
+    if group_type == "building":
+      if not building_info:
+        building_info = {
+          'type': "building",
+          'address': "神奈川県川崎市中原区小杉町1-403",
+          'country': "Japan",
+          'latitude': "35.577510",
+          'longitude': "139.658149"
+        }
+
+      payload['additionalInfo'][0]['attributes'].update(building_info)
+
+    group_name_list = self.get_group_names()
+    has_group_name = group_name in group_name_list
+    has_parent_name = parent_name in group_name_list
+    if not has_parent_name:
+      result['msg'] = "there is no parent_name in group_name_list"
+      return result
+
+    api_path = '/api/v1/group'
+
+    if state == 'present' and has_group_name:
+      result['failed'] = False
+      result['msg'] = "group_name {} already exists".format(group_name)
+    elif state == 'present' and not has_group_name:
+      create_result = self.create_object(api_path=api_path, data=payload)
+      result.update(create_result)
+    elif state == 'absent' and has_group_name:
+      group_id = self.get_group_id_by_name(group_name)
+      api_path = api_path + '/' + str(group_id)
+      delete_result = self.delete_object(api_path=api_path)
+      result.update(delete_result)
+    elif state == 'absent' and not has_group_name:
+      result['failed'] = False
+      result['msg'] = "group_name {} is already absent".format(group_name)
+
+    return result
 
   #
 
@@ -756,10 +1044,10 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=logging.INFO)
 
-    # Cisco DevNet Sandbox
-    # https://sandboxdnac2.cisco.com
-    params = {
+    # Cisco DevNet Sandbox version 1.2.10 readonly
+    _params_readonly = {
       'host': 'sandboxdnac2.cisco.com',
+      'port': 443,
       'username': 'devnetuser',
       'password': 'Cisco123!',
       'timeout': 30,
@@ -767,52 +1055,92 @@ if __name__ == '__main__':
       'http_proxy': ''  ## http://username:password@proxy-url:8080
     }
 
+    _params_reserved = {
+      'host': '10.10.20.85',
+      'port': 443,
+      'username': 'admin',
+      'password': 'Cisco1234!',
+      'timeout': 30,
+      'log_dir': './log',
+      'http_proxy': ''  ## http://username:password@proxy-url:8080
+    }
+
+    params = _params_readonly
+    params = _params_reserved
+
     drc = DnacRestClient(params)
 
-    # test authentication
-    token = drc.get_token()
-    if not token:
-      print('failed to get token')
-      return -1
-
-    # parse token as JWT format
-    payload = drc.parse_jwt(token)
-    print(json.dumps(payload, ensure_ascii=False, indent=2))
-
-    # TEST: dump group dictionary
-    # _test_group(drc)
-
-    # TEST: get list of group names
-    _test_group_names(drc)
-
-    # TEST: get groupUuid
-    # _test_group_id(drc, 'test123')
+    # _test_token(drc)
+    # _test_api_path(drc)
+    # _test_dump_group(drc)
+    # _test_dump_group_by_name(drc)
+    # _test_group_names(drc)
+    # _test_group_id(drc)
+    # _test_banner(drc, 'test123', 'Created by Ansible')
 
     return 0
 
 
-  def _test_group(drc):
-    api_path = drc.API_PATH_GROUP
-    result = drc.get(api_path)
-    print(json.dumps(result, ensure_ascii=False, indent=2))
-    # {
-    #   "failed": true,
-    #   "status_code": 200,
-    #   "Content-Type": "application/json",
-    #   "data": {
-    #     "response": [
-    #       {
-    #         "parentId": "ba06348e-ee80-4058-bb23-f0c9a5fd728b",
-    #         "systemGroup": false,
+  def _test_token(drc):
+    token = drc.get_token()
+    if token:
+      # parse token as JWT format
+      payload = drc.parse_jwt(token)
+      print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+      print('failed to get token')
+
+  def _test_api_path(drc):
+    api_path_list = [
+      '/dna/intent/api/v1/network-device/count',
+      # '/dna/intent/api/v1/network-device',
+      # '/dna/intent/api/v1/network-device?managementIpAddress=10.*&hostname=T1-8',
+      # '/dna/intent/api/v1/network-device?managementIpAddress=10.10.20.81',
+      # '/dna/intent/api/v1/site/count',                # version 1.3 and above
+      # '/dna/intent/api/v1/site/?offset=0&limit=1',    # version 1.3 and above
+      # '/api/v1/group',
+      '/api/v1/group/count',  # 数を入手できるが、全て混ざった状態
+      '/api/v1/group/ce4745ec-d99b-4d12-b008-5ad6513b09c3'  # group/{{ id }} でそのグループの情報だけを入手できる
+    ]
+    for api_path in api_path_list:
+      get_result = drc.get(api_path=api_path)
+      print(json.dumps(get_result, ensure_ascii=False, indent=2))
+
+  def _test_dump_group(drc):
+    api_path = '/api/v1/group'
+    get_result = drc.get(api_path)
+    print(json.dumps(get_result, ensure_ascii=False, indent=2))
+
+  def _test_dump_group_by_name(drc):
+    api_path = '/api/v1/group'
+    get_result = drc.get(api_path)
+    data = get_result.get('data')
+    group_list = data.get('response')
+
+    result = []
+    names = ['iida', 'ksg-tp', 'Floor 18']
+    for group in group_list:
+      if group.get('name') in names:
+        result.append(group)
+    for group in result:
+      print(json.dumps(group, ensure_ascii=False, indent=2))
 
   def _test_group_names(drc):
     group_names = drc.get_group_names()
-    for name in group_names:
-      print(name)
+    print(json.dumps(group_names, ensure_ascii=False, indent=2))
 
-  def _test_group_id(drc, group_name):
+  def _test_group_id(drc):
+    group_name = 'Global'
     result = drc.get_group_id_by_name(group_name)
     print(result)
+
+  def _test_process_group(drc):
+    process_result = drc.process_group(self, state='present', group_name='', group_type='area', parent_name='Global', building_info=None):
+
+
+  def _test_process_banner(drc, group_name, banner_message):
+    result = drc.process_banner(state='present', banner_message=banner_message, group_name=group_name, retain_banner=True)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
   # 実行

@@ -1,0 +1,160 @@
+
+サイトは
+　エリア
+　ビルディング
+　フロア
+の階層になっている。
+
+
+
+エリアの例
+
+{
+  "parentId": "33fbd22e-e408-4035-a5d4-53d91732b9f7",
+  "systemGroup": false,
+  "additionalInfo": [
+    {
+      "nameSpace": "Location",
+      "attributes": {
+        "addressInheritedFrom": "ce4745ec-d99b-4d12-b008-5ad6513b09c3",
+        "type": "area"
+      }
+    },
+    {
+      "nameSpace": "System Settings",
+      "attributes": {
+        "group.count.total": "2",
+        "hasChild": "TRUE",
+        "group.count.direct": "1",
+        "group.hierarchy.groupType": "SITE",
+        "member.count.total": "1",
+        "member.count.direct": "0"
+      }
+    },
+    {
+      "nameSpace": "com.wireless.managingwlc",
+      "attributes": {
+        "anchorWlcInheritedFrom": "ce4745ec-d99b-4d12-b008-5ad6513b09c3",
+        "primaryWlcInheritedFrom": "ce4745ec-d99b-4d12-b008-5ad6513b09c3"
+      }
+    }
+  ],
+  "groupTypeList": [
+    "SITE"
+  ],
+  "groupHierarchy": "33fbd22e-e408-4035-a5d4-53d91732b9f7/ce4745ec-d99b-4d12-b008-5ad6513b09c3",
+  "groupNameHierarchy": "Global/iida",
+  "name": "iida",
+  "instanceTenantId": "5be5fcaaee9a67004cf94d6b",
+  "id": "ce4745ec-d99b-4d12-b008-5ad6513b09c3"
+}
+
+
+ビルディングの例
+
+{
+  "parentId": "ce4745ec-d99b-4d12-b008-5ad6513b09c3",
+  "systemGroup": false,
+  "additionalInfo": [
+    {
+      "nameSpace": "com.wireless.managingwlc",
+      "attributes": {
+        "anchorWlcInheritedFrom": "ce4745ec-d99b-4d12-b008-5ad6513b09c3",
+        "primaryWlcInheritedFrom": "ce4745ec-d99b-4d12-b008-5ad6513b09c3"
+      }
+    },
+    {
+      "nameSpace": "Location",
+      "attributes": {
+        "country": "Japan",
+        "address": "Japan, 神奈川県川崎市中原区小杉町1-403",
+        "latitude": "35.577510",
+        "addressInheritedFrom": "88d4472a-ef4e-4038-8ee9-0e03ecc5a591",
+        "type": "building",
+        "longitude": "139.658149"
+      }
+    },
+    {
+      "nameSpace": "System Settings",
+      "attributes": {
+        "group.count.total": "1",
+        "hasChild": "TRUE",
+        "group.count.direct": "1",
+        "group.hierarchy.groupType": "SITE",
+        "member.count.total": "1",
+        "member.count.direct": "1"
+      }
+    }
+  ],
+  "groupTypeList": [
+    "SITE"
+  ],
+  "groupHierarchy": "33fbd22e-e408-4035-a5d4-53d91732b9f7/ce4745ec-d99b-4d12-b008-5ad6513b09c3/88d4472a-ef4e-4038-8ee9-0e03ecc5a591",
+  "groupNameHierarchy": "Global/iida/ksg-tp",
+  "name": "ksg-tp",
+  "instanceTenantId": "5be5fcaaee9a67004cf94d6b",
+  "id": "88d4472a-ef4e-4038-8ee9-0e03ecc5a591"
+}
+
+
+フロアの例
+
+{
+  "parentId": "88d4472a-ef4e-4038-8ee9-0e03ecc5a591",
+  "systemGroup": false,
+  "additionalInfo": [
+    {
+      "nameSpace": "Location",
+      "attributes": {
+        "address": "Japan, 神奈川県川崎市中原区小杉町1-403",
+        "addressInheritedFrom": "88d4472a-ef4e-4038-8ee9-0e03ecc5a591",
+        "type": "floor"
+      }
+    },
+    {
+      "nameSpace": "com.wireless.managingwlc",
+      "attributes": {
+        "anchorWlcInheritedFrom": "ce4745ec-d99b-4d12-b008-5ad6513b09c3",
+        "primaryWlcInheritedFrom": "ce4745ec-d99b-4d12-b008-5ad6513b09c3"
+      }
+    },
+    {
+      "nameSpace": "System Settings",
+      "attributes": {
+        "group.count.total": "0",
+        "hasChild": "FALSE",
+        "group.count.direct": "0",
+        "group.hierarchy.groupType": "SITE",
+        "member.count.total": "0",
+        "member.count.direct": "0"
+      }
+    },
+    {
+      "nameSpace": "mapGeometry",
+      "attributes": {
+        "offsetX": "0.0",
+        "offsetY": "0.0",
+        "length": "100.0",
+        "width": "100.0",
+        "geometryType": "DUMMYTYPE",
+        "height": "10.0"
+      }
+    },
+    {
+      "nameSpace": "mapsSummary",
+      "attributes": {
+        "rfModel": "35035",
+        "locationGroup": "",
+        "floorIndex": "1"
+      }
+    }
+  ],
+  "groupTypeList": [
+    "SITE"
+  ],
+  "groupHierarchy": "33fbd22e-e408-4035-a5d4-53d91732b9f7/ce4745ec-d99b-4d12-b008-5ad6513b09c3/88d4472a-ef4e-4038-8ee9-0e03ecc5a591/832b090c-af2c-4079-9e10-25b4c511d41b",
+  "groupNameHierarchy": "Global/iida/ksg-tp/Floor 18",
+  "name": "Floor 18",
+  "instanceTenantId": "5be5fcaaee9a67004cf94d6b",
+  "id": "832b090c-af2c-4079-9e10-25b4c511d41b"
+}
