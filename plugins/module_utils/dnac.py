@@ -1077,6 +1077,7 @@ if __name__ == '__main__':
     # _test_group_names(drc)
     # _test_group_id(drc)
     # _test_banner(drc, 'test123', 'Created by Ansible')
+    _test_process_group(drc)
 
     return 0
 
@@ -1135,8 +1136,8 @@ if __name__ == '__main__':
     print(result)
 
   def _test_process_group(drc):
-    process_result = drc.process_group(self, state='present', group_name='', group_type='area', parent_name='Global', building_info=None):
-
+    process_result = drc.process_group(state='present', group_name='iida', group_type='area', parent_name='Global', building_info=None)
+    print(json.dumps(process_result, ensure_ascii=False, indent=2))
 
   def _test_process_banner(drc, group_name, banner_message):
     result = drc.process_banner(state='present', banner_message=banner_message, group_name=group_name, retain_banner=True)
