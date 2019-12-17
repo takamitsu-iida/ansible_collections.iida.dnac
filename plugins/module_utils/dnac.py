@@ -32,11 +32,10 @@ except ImportError as e:
   sys.exit(1)
 
 try:
-  # pip install pyjwt
-  import jwt
+  import jwt  # pip install pyjwt
   HAS_JWT = True
 except ImportError as e:
-  import base64  # deode jwt by hand
+  import base64  # decode jwt by hand
   HAS_JWT = False
 
 
@@ -45,9 +44,10 @@ class DnacRestClient(object):
   """
   # pylint: disable=too-many-instance-attributes,too-many-public-methods
 
-  API_PATH_TOKEN = '/dna/system/api/v1/auth/token'  # Cisco DNA Center version 1.2.6 and above
+  # Cisco DNA Center version 1.2.6 and above
+  API_PATH_TOKEN = '/dna/system/api/v1/auth/token'
 
-  # wait until completion of async operation with these interval and count
+  # parameters for async operation
   RETRY_INTERVAL = 2
   MAX_RETRY_COUNT = 10
 
@@ -74,8 +74,7 @@ class DnacRestClient(object):
     # file name of token cache
     token_filename = "{}.pickle".format(app_name)
 
-    # directory name of token cache
-    # /tmp is used if not specified
+    # directory name of token cache, /tmp is used if not specified
     self.log_dir = params.get('log_dir', '/tmp')
     os.makedirs(self.log_dir, exist_ok=True)
 
@@ -522,7 +521,7 @@ class DnacRestClient(object):
         result['status_code'] = r.status_code
         logging.info("%s %s", r.status_code, r.url)
 
-        # remove token in cache if authentication error
+        # remove token cache if authentication error
         if r.status_code == 401:
           self.save_token(None)
           result['msg'] = "authentication error"
@@ -616,38 +615,42 @@ class DnacRestClient(object):
 
     result = {
       'failed': True,
-      'msg': '',
-      'response': None
+      'msg': ''
     }
 
     start_time = time.time()
 
     while True:
-      r = self.get(api_path=api_path)
-      if not r:
-        return result
+      get_result = self.get(api_path=api_path)
+      if not get_result:
+        result['msg'] = 'failed before requests.get()'
+        break
 
-      data = r.get('data')
+      data = get_result.get('data', {})
       response = data.get('response')
       # print(json.dumps(response, ensure_ascii=False, indent=2))
 
       if 'endTime' in response:
+        result.update(get_result)
         result['failed'] = False
-        return response
+        break
 
       if start_time + timeout < time.time():
+        result.update(get_result)
+        result['failed'] = True
         result['msg'] = "task_id {} did not end within the specified timeout ({} sec)".format(task_id, timeout)
-        return result
+        break
+
+      if response.get('isError') is True:
+        result.update(get_result)
+        result['failed'] = True
+        result['msg'] = "task_id {} is error".format(task_id)
+        break
 
       logging.info("task_id %s has not completed yet. Sleeping %s seconds...", task_id, interval)
       time.sleep(interval)
 
-      if response.get('isError', False) is True:
-        result['msg'] = "task_id {} is error".format(task_id)
-        result['original_message'] = response.get('progress')
-        return result
-
-    return response
+    return result
 
 
   def create_object(self, api_path='', data=None):
@@ -730,13 +733,14 @@ class DnacRestClient(object):
 
     delete_result = self.delete(api_path=api_path)
 
+    status_code = delete_result.get('status_code', -1)
     data = delete_result.get('data')
 
-    if delete_result.get('status_code', -1) in [200, 201, 204, 206]:
+    if status_code in [200, 201, 204, 206]:
       # successfuly ended
       result['changed'] = True
       result.update(delete_result)
-    elif delete_result.get('status_code', -1) == 202:
+    elif status_code == 202:
       # successfully ended but async operation is needed
       response = data.get('response')
       task_id = response.get('taskId')
@@ -744,7 +748,7 @@ class DnacRestClient(object):
       result.update(wait_result)
       result['changed'] = not wait_result.get('failed')
     else:
-      # fail
+      # failed
       result.update(delete_result)
 
     return result
@@ -763,42 +767,38 @@ class DnacRestClient(object):
         str -- group id
     """
 
-    if not group_name:
-      return '-1'
-
-    if group_name.lower() == 'global':
+    if not group_name or group_name.lower() == 'global':
       return '-1'
 
     api_path = '/api/v1/group'
+    get_result = self.get(api_path)
+    if not get_result or get_result.get('failed', True):
+      return '0'
 
-    result = self.get(api_path)
-    if not result or result.get('failed', True):
-      return '-1'
-
-    data = result.get('data')
+    data = get_result.get('data')
+    response = data.get('response')
     #   "data": {
     #     "response": [
     #       {
     #         "parentId": "ba06348e-ee80-4058-bb23-f0c9a5fd728b",
-    response = data.get('response')
     if not response:
-      return '-1'
+      return '0'
 
     group_ids = [group.get('id') for group in response if group.get('name') == group_name]
     if len(group_ids) == 1:
       return group_ids[0]
 
-    return '-1'
+    return '0'
 
 
   def get_site_names(self):
-    """get all site name
+    """get all site name as dict
 
     VERSION 1.3
     '/dna/intent/api/v1/site'
 
     Returns:
-        list -- list of all group name
+        dict -- list of all group name
     """
     _cache = {}
 
@@ -883,7 +883,7 @@ class DnacRestClient(object):
     result['want'] = want_settings
 
     if state == 'present' and have_settings_count == 1:
-      # have exist
+      # have exists
       # compare have and want
       if have_settings[0]['value'] == want_settings[0]['value']:
         result['failed'] = False
@@ -894,7 +894,7 @@ class DnacRestClient(object):
           result.update(create_result)
 
     elif state == 'present' and have_settings_count == 0:
-      # create new
+      # create new object
       create_result = self.create_object(api_path=api_path, data=want_settings)
       if create_result:
         result.update(create_result)
@@ -965,7 +965,7 @@ class DnacRestClient(object):
 
     '/api/v1/group'
 
-    group_type is a choice of "area" "building" "floor"
+    group_type is a choice of "area", "building", "floor"
 
     Keyword Arguments:
         state {str} -- [description] (default: {'present'})
@@ -1076,7 +1076,7 @@ if __name__ == '__main__':
     # _test_dump_group_by_name(drc)
     # _test_group_names(drc)
     # _test_group_id(drc)
-    # _test_banner(drc, 'test123', 'Created by Ansible')
+    # _test_banner(drc)
     _test_process_group(drc)
 
     return 0
@@ -1100,8 +1100,8 @@ if __name__ == '__main__':
       # '/dna/intent/api/v1/site/count',                # version 1.3 and above
       # '/dna/intent/api/v1/site/?offset=0&limit=1',    # version 1.3 and above
       # '/api/v1/group',
-      '/api/v1/group/count',  # 数を入手できるが、全て混ざった状態
-      '/api/v1/group/ce4745ec-d99b-4d12-b008-5ad6513b09c3'  # group/{{ id }} でそのグループの情報だけを入手できる
+      # '/api/v1/group/count',  # all group include area, building, floor, ...
+      '/api/v1/group/ce4745ec-d99b-4d12-b008-5ad6513b09c3'  # group/{{ id }} returns specific group object
     ]
     for api_path in api_path_list:
       get_result = drc.get(api_path=api_path)
@@ -1138,8 +1138,12 @@ if __name__ == '__main__':
   def _test_process_group(drc):
     process_result = drc.process_group(state='present', group_name='iida', group_type='area', parent_name='Global', building_info=None)
     print(json.dumps(process_result, ensure_ascii=False, indent=2))
+    process_result = drc.process_group(state='present', group_name='ksg-tp', group_type='building', parent_name='iida', building_info=None)
+    print(json.dumps(process_result, ensure_ascii=False, indent=2))
 
-  def _test_process_banner(drc, group_name, banner_message):
+  def _test_process_banner(drc):
+    group_name = "iida"
+    banner_message = "Created by Ansible"
     result = drc.process_banner(state='present', banner_message=banner_message, group_name=group_name, retain_banner=True)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 

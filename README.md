@@ -1,5 +1,7 @@
 # Ansible Collection - iida.dnac
 
+(未完成、バックアップ用リポジトリ)
+
 Cisco DNA CenterをREST APIで操作するAnsibleコレクションです。
 
 ## Requirements
@@ -84,3 +86,8 @@ Cisco DNA-Cの使い方自体はユーザガイドを見ること。
 - Ansible Developing Collections
 
 <https://docs.ansible.com/ansible/latest/dev_guide/developing_collections.html>
+
+<https://github.com/jandiorio/ansible-dnac-modules>
+<https://github.com/CiscoDevNet/DNAC-Top5>
+<https://github.com/CiscoDevNet/DNAC-Site>
+<https://github.com/CiscoDevNet?language=&page=1&q=dna&type=&utf8=%E2%9C%93>
