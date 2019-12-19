@@ -51,7 +51,6 @@ class DnacRestClient(object):
   RETRY_INTERVAL = 2
   MAX_RETRY_COUNT = 10
 
-
   def __init__(self, params):
     """constructor for DnacRestClient class
 
@@ -63,6 +62,7 @@ class DnacRestClient(object):
       - password
       - timeout
       - http_proxy
+      - runsync
 
     Arguments:
         params {dict} -- param dictionary
@@ -118,6 +118,9 @@ class DnacRestClient(object):
     else:
       self._proxies = None
 
+    # force sync operation, default is False
+    self._runsync = params.get('runsync', False)
+
     # on memory cache for async operation
     # async operation repeats get method until process end
     self._token = ''
@@ -172,6 +175,13 @@ class DnacRestClient(object):
     if not _:
       return self._proxies
     self._proxies = _[0]
+    return self
+
+  def runsync(self, *_):
+    """get/set _runsync"""
+    if not _:
+      return self._runsync
+    self._runsync = _[0]
     return self
 
 
@@ -483,6 +493,9 @@ class DnacRestClient(object):
           'x-auth-token': token
         }
 
+        if self.runsync() is True:
+          headers.update({'__runsync': "true"})
+
         timeout = self.timeout()
         proxies = self.proxies()
 
@@ -547,6 +560,13 @@ class DnacRestClient(object):
   @staticmethod
   def _normalize_api_path(api_path):
     return api_path.strip('/')
+
+  @staticmethod
+  def _extract_response(get_result):
+    if not get_result:
+      return None
+    data = get_result.get('data', {})
+    return data.get('response')
 
 
   @set_token()
@@ -1027,20 +1047,101 @@ class DnacRestClient(object):
 
     return result
 
+
+  def assign_devices(self, site_id, device_list):
+    """assign devices to site
+
+    Arguments:
+        site_id {[type]} -- [description]
+        device_list {[type]} -- [description]
+    """
+    payload = {
+      "device": device_list
+    }
+
+    payload = {
+      "device": [{
+        "serialNumber": "FOC1703V36B",
+        "siteName": "Area1-BLD1",
+        "ip": ""
+      }, {
+        "serialNumber": "FTX1842AHM1",
+        "siteName": "Area1-BLD1",
+        "ip": ""
+      }, {
+        "serialNumber": "FTX1842AHM2",
+        "siteName": "Area1-BLD2",
+        "ip": ""
+      }, {
+        "serialNumber": "FOX1525G5S1",
+        "siteName": "Area1-BLD2",
+        "ip": ""
+      }, {
+        "serialNumber": "FOX1524GV2Z",
+        "siteName": "Area3-BLD1",
+        "ip": ""
+      }, {
+        "serialNumber": "FXS1825Q1PA",
+        "siteName": "Area3-BLD1",
+        "ip": ""
+      }, {
+        "serialNumber": "FCW1630L0JG",
+        "siteName": "Area3-BLD2",
+        "ip": ""
+      }]
+    }
+
+    api_path = '/dna/intent/api/v1/site/{}/device'.format(site_id)
+    response = self.post(api_path=api_path, data=payload)
+    print(json.dumps(response, indent=2))
+
+  def get_device_list(self):
+    """get device object list"""
+    api_path = '/dna/intent/api/v1/network-device'
+    get_result = self.get(api_path=api_path)
+    return self._extract_response(get_result)
+
+  def get_device_by_ip(self, ip=None):
+    """get device object by ip address"""
+    if ip is None:
+      return None
+    api_path = '/dna/intent/api/v1/network-device?managementIpAddress={}'.format(ip),
+    get_result = self.get(api_path=api_path)
+    return self._extract_response(get_result)
+
+  def get_device_by_serial(self, serial_number=None):
+    """get device object by serial number"""
+    if serial_number is None:
+      return None
+    api_path = '/intent/api/v1/network-device/serial-number/{}'.format(serial_number)
+    get_result = self.get(api_path=api_path)
+    return self._extract_response(get_result)
+
+  def get_host_by_ip(self, ip=None):
+    """get host object by ip address"""
+    if ip is None:
+      return None
+    api_path = '/api/v1/host?hostIp={}'.format(ip)
+    get_result = self.get(api_path=api_path)
+    return self._extract_response(get_result)
+
+  def get_host_by_mac(self, mac=None):
+    """get host object by mac address"""
+    if mac is None:
+      return None
+    api_path = '/api/v1/host?hostMac={}'.format(mac)
+    get_result = self.get(api_path=api_path)
+    return self._extract_response(get_result)
+
   #
 
-
 #
-# ここから単体テスト
+# TEST
 #
 if __name__ == '__main__':
 
   def main():
-    """main function for test
-
-    Returns:
-      int -- 0 successfully ended or other
-    """
+    """main function for test"""
 
     logging.basicConfig(level=logging.INFO)
 
@@ -1065,24 +1166,28 @@ if __name__ == '__main__':
       'http_proxy': ''  ## http://username:password@proxy-url:8080
     }
 
-    params = _params_readonly
-    params = _params_reserved
+    HAS_RESERVATION = False
+    params = _params_reserved if HAS_RESERVATION else _params_readonly
 
     drc = DnacRestClient(params)
 
-    # _test_token(drc)
-    # _test_api_path(drc)
-    # _test_dump_group(drc)
-    # _test_dump_group_by_name(drc)
-    # _test_group_names(drc)
-    # _test_group_id(drc)
-    # _test_banner(drc)
-    _test_process_group(drc)
+    # test_token(drc)
+    # test_api_path(drc)
+    # test_dump_group(drc)
+    # test_dump_group_by_name(drc)
+    # test_group_names(drc)
+    # test_group_id(drc)
+    # test_banner(drc)
+    # test_process_group(drc)
+
+    r = drc.get_device_list()
+    print(json.dumps(r, ensure_ascii=False, indent=2))
 
     return 0
 
 
-  def _test_token(drc):
+  def test_token(drc):
+    """test token"""
     token = drc.get_token()
     if token:
       # parse token as JWT format
@@ -1091,28 +1196,34 @@ if __name__ == '__main__':
     else:
       print('failed to get token')
 
-  def _test_api_path(drc):
+  def test_api_path(drc):
+    """test api_path"""
     api_path_list = [
-      '/dna/intent/api/v1/network-device/count',
-      # '/dna/intent/api/v1/network-device',
+      # '/dna/intent/api/v1/network-device/count',
+      # '/dna/intent/api/v1/network-device',            # all network devices
       # '/dna/intent/api/v1/network-device?managementIpAddress=10.*&hostname=T1-8',
       # '/dna/intent/api/v1/network-device?managementIpAddress=10.10.20.81',
       # '/dna/intent/api/v1/site/count',                # version 1.3 and above
       # '/dna/intent/api/v1/site/?offset=0&limit=1',    # version 1.3 and above
+      #
       # '/api/v1/group',
       # '/api/v1/group/count',  # all group include area, building, floor, ...
-      '/api/v1/group/ce4745ec-d99b-4d12-b008-5ad6513b09c3'  # group/{{ id }} returns specific group object
+      # '/api/v1/group/ce4745ec-d99b-4d12-b008-5ad6513b09c3'  # group/{{ id }} returns specific group object
+      '/api/v1/host',
+      '/api/v1/host?hostIp=10.10.20.83'
     ]
     for api_path in api_path_list:
       get_result = drc.get(api_path=api_path)
       print(json.dumps(get_result, ensure_ascii=False, indent=2))
 
-  def _test_dump_group(drc):
+  def test_dump_group(drc):
+    """test dump group"""
     api_path = '/api/v1/group'
     get_result = drc.get(api_path)
     print(json.dumps(get_result, ensure_ascii=False, indent=2))
 
-  def _test_dump_group_by_name(drc):
+  def test_dump_group_by_name(drc):
+    """test dump group by name"""
     api_path = '/api/v1/group'
     get_result = drc.get(api_path)
     data = get_result.get('data')
@@ -1126,22 +1237,26 @@ if __name__ == '__main__':
     for group in result:
       print(json.dumps(group, ensure_ascii=False, indent=2))
 
-  def _test_group_names(drc):
+  def test_group_names(drc):
+    """test group names"""
     group_names = drc.get_group_names()
     print(json.dumps(group_names, ensure_ascii=False, indent=2))
 
-  def _test_group_id(drc):
+  def test_group_id(drc):
+    """test group_id"""
     group_name = 'Global'
     result = drc.get_group_id_by_name(group_name)
     print(result)
 
-  def _test_process_group(drc):
+  def test_process_group(drc):
+    """test process_group()"""
     process_result = drc.process_group(state='present', group_name='iida', group_type='area', parent_name='Global', building_info=None)
     print(json.dumps(process_result, ensure_ascii=False, indent=2))
     process_result = drc.process_group(state='present', group_name='ksg-tp', group_type='building', parent_name='iida', building_info=None)
     print(json.dumps(process_result, ensure_ascii=False, indent=2))
 
-  def _test_process_banner(drc):
+  def test_process_banner(drc):
+    """test process_banner()"""
     group_name = "iida"
     banner_message = "Created by Ansible"
     result = drc.process_banner(state='present', banner_message=banner_message, group_name=group_name, retain_banner=True)
