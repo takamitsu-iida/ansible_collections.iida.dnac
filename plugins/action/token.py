@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# pylint: disable=W0212,C0111,E0611
+# pylint: disable=missing-docstring
 
 # (c) Takamitsu IIDA (@takamitsu-iida)
 
@@ -13,16 +13,13 @@ import time
 from ansible.plugins.action.normal import ActionModule as _ActionModule
 
 # import from collection
-# ansible 2.9 or later
 from ansible_collections.iida.dnac.plugins.module_utils.dnac import DnacRestClient
 
 try:
-  # pylint: disable=W0611
-  # W0611:Unused display imported from __main__
+  # pylint: disable=unused-import
   from __main__ import display
 except ImportError:
-  # pylint: disable=C0412
-  # C0412:Imports from package ansible are not grouped
+  # pylint: disable=ungrouped-imports
   from ansible.utils.display import Display
   display = Display()
 
@@ -56,13 +53,13 @@ class ActionModule(_ActionModule):
     #
 
     #
-    # hostvarsを取り出す
+    # get hostvars
     #
     inventory_hostname = task_vars.get('inventory_hostname')
     hostvars = task_vars['hostvars'].get(inventory_hostname)
 
     #
-    # インベントリ（hostvars）から情報を取り出す
+    # get info from inventories
     #
     remote_addr = hostvars.get('remote_addr') or hostvars.get('ansible_ssh_host') or hostvars.get('ansible_host')
     port = hostvars.get('port') or hostvars.get('ansible_ssh_port') or hostvars.get('ansible_port', 443)
@@ -81,8 +78,8 @@ class ActionModule(_ActionModule):
     # display.vvv(password)
 
     #
-    # self._task.argsに不足があれば追加する
-    # タスクでパラメータを指定していないなら、インベントリの情報で補完する
+    # add info to self._task.args
+    # if task in playbook does not specify parameters, add info from inventories
     #
     if not self._task.args.get('host') and remote_addr:
       self._task.args['host'] = remote_addr
@@ -106,11 +103,9 @@ class ActionModule(_ActionModule):
       self._task.args['log_dir'] = log_dir
 
     #
-    # run module
-    #
-
-    # do not run the module
+    # DO NOT RUN THE MODULE
     # result = super(ActionModule, self).run(task_vars=task_vars)
+    #
 
     #
     # post process

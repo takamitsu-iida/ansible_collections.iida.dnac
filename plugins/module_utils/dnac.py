@@ -25,7 +25,6 @@ import sys
 
 try:
   import requests
-  # pylint: disable=E1101
   requests.packages.urllib3.disable_warnings()
 except ImportError as e:
   logging.exception(e)
@@ -46,6 +45,12 @@ class DnacRestClient(object):
 
   # Cisco DNA Center version 1.2.6 and above
   API_PATH_TOKEN = '/dna/system/api/v1/auth/token'
+
+  # DEFAULTS
+  DEFAULT_LOGDIR = '/tmp'
+  DEFAULT_CHECKMODE = False
+  DEFAULT_TIMEOUT = 30  # timeout used in requests module, default is 30 sec
+
 
   # parameters for async operation
   RETRY_INTERVAL = 2
@@ -75,7 +80,7 @@ class DnacRestClient(object):
     token_filename = "{}.pickle".format(app_name)
 
     # directory name of token cache, /tmp is used if not specified
-    self.log_dir = params.get('log_dir', '/tmp')
+    self.log_dir = params.get('log_dir', self.DEFAULT_LOGDIR)
     os.makedirs(self.log_dir, exist_ok=True)
 
     # path of token cache
@@ -95,7 +100,7 @@ class DnacRestClient(object):
         pass
 
     # is check_mode or not, default is False
-    self._check_mode = params.get('check_mode', False)
+    self._check_mode = params.get('check_mode', self.DEFAULT_CHECKMODE)
 
     # target hostname fqdn or ip addr, port
     self._host = params.get('host')
@@ -105,8 +110,8 @@ class DnacRestClient(object):
     self._username = params.get('username', '')
     self._password = params.get('password', '')
 
-    # timeout used in requests module, default is 30 sec
-    self._timeout = params.get('timeout', 30)
+    # timeout used in requests module
+    self._timeout = params.get('timeout', self.DEFAULT_TIMEOUT)
 
     # http proxy, http://username:password@proxy-server-fqdn:8080
     http_proxy = params.get('http_proxy')
@@ -566,8 +571,9 @@ class DnacRestClient(object):
     if not get_result:
       return None
     data = get_result.get('data', {})
-    return data.get('response')
-
+    if isinstance(data, dict):
+      return data.get('response')
+    return None
 
   @set_token()
   def get(self, api_path='', params=None, **kwargs):
@@ -1105,7 +1111,7 @@ class DnacRestClient(object):
     """get device object by ip address"""
     if ip is None:
       return None
-    api_path = '/dna/intent/api/v1/network-device?managementIpAddress={}'.format(ip),
+    api_path = '/dna/intent/api/v1/network-device?managementIpAddress={}'.format(ip)
     get_result = self.get(api_path=api_path)
     return self._extract_response(get_result)
 
@@ -1113,7 +1119,13 @@ class DnacRestClient(object):
     """get device object by serial number"""
     if serial_number is None:
       return None
-    api_path = '/intent/api/v1/network-device/serial-number/{}'.format(serial_number)
+    api_path = '/dna/intent/api/v1/network-device?serialNumber={}'.format(serial_number)
+    get_result = self.get(api_path=api_path)
+    return self._extract_response(get_result)
+
+  def get_host_list(self):
+    """get host object list"""
+    api_path = '/api/v1/host'
     get_result = self.get(api_path=api_path)
     return self._extract_response(get_result)
 
@@ -1180,7 +1192,7 @@ if __name__ == '__main__':
     # test_banner(drc)
     # test_process_group(drc)
 
-    r = drc.get_device_list()
+    r = drc.get_host_by_mac(mac="f0:25:72:2a:d2:41")
     print(json.dumps(r, ensure_ascii=False, indent=2))
 
     return 0
