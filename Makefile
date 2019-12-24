@@ -10,7 +10,7 @@ COLLECTIONS_VERSION=0.0.1
 COLLECTIONS_FILE=$(COLLECTIONS_ORG)-$(COLLECTIONS_NAME)-$(COLLECTIONS_VERSION).tar.gz
 
 
-all: help
+all: help build install
 
 help:
 	@echo "make command options"
