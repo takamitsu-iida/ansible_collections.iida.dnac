@@ -2,14 +2,33 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=missing-module-docstring
 
-from dnac_devices import DnacDevices
-from dnac_host import DnacHost
-from dnac_group import DnacGroup
-
-class Dnac(DnacDevices, DnacHost, DnacGroup):
-  """Manage Dna Center
+class DnacHost:
+  """Manage Network Hosts
   """
 
+  def get_host_list(self, drc):
+    """get host object list"""
+    api_path = '/api/v1/host'
+    get_result = drc.get(api_path=api_path)
+    return drc.extract_data_response(get_result)
+
+
+  def get_host_by_ip(self, drc, ip=None):
+    """get host object by ip address"""
+    if ip is None:
+      return None
+    api_path = '/api/v1/host?hostIp={}'.format(ip)
+    get_result = drc.get(api_path=api_path)
+    return drc.extract_data_response(get_result)
+
+
+  def get_host_by_mac(self, drc, mac=None):
+    """get host object by mac address"""
+    if mac is None:
+      return None
+    api_path = '/api/v1/host?hostMac={}'.format(mac)
+    get_result = drc.get(api_path=api_path)
+    return drc.extract_data_response(get_result)
 
 
 if __name__ == '__main__':
@@ -49,10 +68,10 @@ if __name__ == '__main__':
     HAS_RESERVATION = False
     params = _params_reserved if HAS_RESERVATION else _params_readonly
 
-    drc = DnacRestClient(params)
-    dnac = Dnac()
+    dnac = DnacRestClient(params)
+    d = DnacHost()
 
-    host_list = dnac.get_host_list(drc)
+    host_list = d.get_host_list(dnac)
     for host in host_list:
       print(json.dumps(host, ensure_ascii=False, indent=2))
 
