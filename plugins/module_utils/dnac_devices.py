@@ -6,6 +6,65 @@ class DnacDevices:
   """Manage Network Devices
   """
 
+  def get_device_list(self, drc):
+    """Get device object list"""
+    api_path = '/dna/intent/api/v1/network-device'
+    get_result = drc.get(api_path=api_path)
+    return drc.extract_data_response(get_result)
+
+
+  def get_device_by_id(self, drc, device_id=None):
+    """Get device by id"""
+    if device_id is None:
+      return None
+    api_path = '/dna/intent/api/v1/network-device'.format(device_id)
+    get_result = drc.get(api_path=api_path)
+    return drc.extract_data_response(get_result)
+
+
+  def get_device_by_ip(self, drc, ip=None):
+    """Get device object by ip address"""
+    if ip is None:
+      return None
+    api_path = '/dna/intent/api/v1/network-device?managementIpAddress={}'.format(ip)
+    get_result = drc.get(api_path=api_path)
+    return drc.extract_data_response(get_result)
+
+
+  def get_device_by_serial(self, drc, serial_number=None):
+    """Get device object by serial number"""
+    if serial_number is None:
+      return None
+    api_path = '/dna/intent/api/v1/network-device?serialNumber={}'.format(serial_number)
+    get_result = drc.get(api_path=api_path)
+    return drc.extract_data_response(get_result)
+
+
+  def get_device_config(self, drc):
+    """Get device config for all devices"""
+    api_path = '/dna/intent/api/v1/network-device/config'
+    get_result = drc.get(api_path=api_path)
+    return drc.extract_data_response(get_result)
+
+
+  def get_device_interface_by_range(self, drc, device_id=None, start_index=0, racords_to_return=1):
+    """Get device interfaces by specified range"""
+    if device_id is None:
+      return None
+    api_path = '/dna/intent/api/v1/interface/network-device/{}/{}/{}'.format(device_id, start_index, racords_to_return)
+    get_result = drc.get(api_path=api_path)
+    return drc.extract_data_response(get_result)
+
+
+  def get_device_interface_by_name(self, drc, device_id=None, name=None):
+    """Get interface details by device_id and interface name"""
+    if device_id is None:
+      return None
+    api_path = '/dna/intent/api/v1/interface/network-device/{}/{}'.format(device_id, name)
+    get_result = drc.get(api_path=api_path)
+    return drc.extract_data_response(get_result)
+
+
   def assign_devices(self, drc, site_id, device_list):
     """assign devices to site
 
@@ -54,29 +113,6 @@ class DnacDevices:
     print(json.dumps(response, indent=2))
 
 
-  def get_device_list(self, drc):
-    """get device object list"""
-    api_path = '/dna/intent/api/v1/network-device'
-    get_result = drc.get(api_path=api_path)
-    return drc.extract_data_response(get_result)
-
-
-  def get_device_by_ip(self, drc, ip=None):
-    """get device object by ip address"""
-    if ip is None:
-      return None
-    api_path = '/dna/intent/api/v1/network-device?managementIpAddress={}'.format(ip)
-    get_result = drc.get(api_path=api_path)
-    return drc.extract_data_response(get_result)
-
-
-  def get_device_by_serial(self, drc, serial_number=None):
-    """get device object by serial number"""
-    if serial_number is None:
-      return None
-    api_path = '/dna/intent/api/v1/network-device?serialNumber={}'.format(serial_number)
-    get_result = drc.get(api_path=api_path)
-    return drc.extract_data_response(get_result)
 
 
 if __name__ == '__main__':
