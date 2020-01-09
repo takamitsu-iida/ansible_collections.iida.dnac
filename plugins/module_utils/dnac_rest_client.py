@@ -73,6 +73,8 @@ class DnacRestClient:
         params {dict} -- param dictionary
     """
 
+    logging.info('DnacRestClient created: %s', params.get('host'))
+
     # use this filename for app name
     app_name = os.path.splitext(os.path.basename(__file__))[0]
 

@@ -2,9 +2,38 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=missing-module-docstring
 
-class DnacGroup:
+from dnac_rest_client import DnacRestClient
+
+class DnacGroup(DnacRestClient):
   """Manage Groups
   """
+
+  def get_group_names(self):
+    """get all group name
+
+    VERSION 1.2
+    '/api/v1/group'
+
+    Returns:
+        list -- list of all group name
+    """
+
+    api_path = '/api/v1/group'
+    get_result = self.get(api_path)
+    if not get_result or get_result.get('failed'):
+      return []
+
+    data = get_result.get('data')
+    #   "data": {
+    #     "response": [
+    #       {
+    #         "parentId": "ba06348e-ee80-4058-bb23-f0c9a5fd728b",
+    response = data.get('response')
+
+    group_names = [group.get('name') for group in response]
+
+    return group_names
+
 
   # lookup group_id by group_name
   def get_group_id_by_name(self, drc, group_name):
@@ -78,33 +107,6 @@ class DnacGroup:
     _cache['Global'] = {'groupNameHierarchy': 'Global', 'additionalInfo': [{'attributes': {'type': 'area'}}]}
 
     return _cache
-
-
-  def get_group_names(self, drc):
-    """get all group name
-
-    VERSION 1.2
-    '/api/v1/group'
-
-    Returns:
-        list -- list of all group name
-    """
-
-    api_path = '/api/v1/group'
-    get_result = drc.get(api_path)
-    if not get_result or get_result.get('failed'):
-      return []
-
-    data = get_result.get('data')
-    #   "data": {
-    #     "response": [
-    #       {
-    #         "parentId": "ba06348e-ee80-4058-bb23-f0c9a5fd728b",
-    response = data.get('response')
-
-    group_names = [group.get('name') for group in response]
-
-    return group_names
 
 
   def process_group(self, drc, state='present', group_name='', group_type='area', parent_name='Global', building_info=None):
@@ -181,45 +183,23 @@ if __name__ == '__main__':
   import logging
   import sys
 
-  from dnac_rest_client import DnacRestClient
+  from dnac_sandbox import sandbox_params
 
   def main():
     """main function for test"""
 
     logging.basicConfig(level=logging.INFO)
 
-    # Cisco DevNet Sandbox version 1.2.10 readonly
-    _params_readonly = {
-      'host': 'sandboxdnac2.cisco.com',
-      'port': 443,
-      'username': 'devnetuser',
-      'password': 'Cisco123!',
-      'timeout': 30,
-      'log_dir': './log',
-      'http_proxy': ''  ## http://username:password@proxy-url:8080
-    }
+    params = sandbox_params.get('always-on-lab')
+    # params = sandbox_params.get('hardware-lab-2')
 
-    _params_reserved = {
-      'host': '10.10.20.85',
-      'port': 443,
-      'username': 'admin',
-      'password': 'Cisco1234!',
-      'timeout': 30,
-      'log_dir': './log',
-      'http_proxy': ''  ## http://username:password@proxy-url:8080
-    }
+    drc = DnacGroup(params)
 
-    HAS_RESERVATION = False
-    params = _params_reserved if HAS_RESERVATION else _params_readonly
-
-    drc = DnacRestClient(params)
-    d = DnacGroup()
-
-    name_list = d.get_group_names(drc)
-    for name in name_list:
-      print(name)
-
-    print(d.get_group_id_by_name(drc, name_list[0]))
+    test_dump_group(drc)
+    test_dump_group_by_name(drc)
+    test_group_names(drc)
+    test_group_id(drc)
+    test_process_group(drc)
 
     return 0
 
