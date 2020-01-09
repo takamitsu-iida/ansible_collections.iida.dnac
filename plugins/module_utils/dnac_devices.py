@@ -17,7 +17,7 @@ class DnacDevices:
     """Get device by id"""
     if device_id is None:
       return None
-    api_path = '/dna/intent/api/v1/network-device'.format(device_id)
+    api_path = '/dna/intent/api/v1/network-device/{}'.format(device_id)
     get_result = drc.get(api_path=api_path)
     return drc.extract_data_response(get_result)
 
