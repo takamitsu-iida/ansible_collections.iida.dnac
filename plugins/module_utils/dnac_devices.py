@@ -128,15 +128,18 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=logging.INFO)
 
-    params = sandbox_params.get('always-on-lab')
-    # params = sandbox_params.get('hardware-lab-2')
+    # params = sandbox_params.get('always-on-lab')
+    params = sandbox_params.get('hardware-lab')
 
     # DnacRestClient class object
     drc = DnacDevices(params)
 
     device_list = drc.get_device_list()
-    for device in device_list:
-      print(json.dumps(device, ensure_ascii=False, indent=2))
+    if device_list:
+      for device in device_list:
+        print(json.dumps(device, ensure_ascii=False, indent=2))
+    else:
+      print("no device found")
 
     return 0
 

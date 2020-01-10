@@ -418,6 +418,14 @@ class DnacRestClient:
     return result
 
 
+  def ping(self):
+    """check connectivity"""
+    result = self.get_token_from_network()
+    if result.get('failed'):
+      print('NG')
+    print('OK')
+
+
   def parse_jwt(self, token):
     """decode JWT format token
 

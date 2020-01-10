@@ -3,6 +3,7 @@
 # pylint: disable=missing-module-docstring
 
 sandbox_params = {
+
   # Cisco DNA Center
   # Always On Lab
   # Version 1.2.10
@@ -17,9 +18,9 @@ sandbox_params = {
   },
 
   # Cisco DNA Center
-  # Hardware Lab 2
+  # Hardware Lab
   # Version 1.2.10
-  'hardware-lab-2': {
+  'hardware-lab': {
     'host': '10.10.20.85',
     'port': 443,
     'username': 'admin',

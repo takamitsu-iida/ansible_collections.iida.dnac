@@ -13,7 +13,6 @@ class Dnac(DnacDevices, DnacHost, DnacGroup):
 
 if __name__ == '__main__':
 
-  import json
   import logging
   import sys
 
@@ -28,17 +27,7 @@ if __name__ == '__main__':
 
     dnac = Dnac(params)
 
-    device_list = dnac.get_device_list()
-    for device in device_list:
-      print(json.dumps(device, ensure_ascii=False, indent=2))
-
-    host_list = dnac.get_host_list()
-    for host in host_list:
-      print(json.dumps(host, ensure_ascii=False, indent=2))
-
-    group_names = dnac.get_group_names()
-    for name in group_names:
-      print(name)
+    dnac.ping()
 
     return 0
 

@@ -8,6 +8,24 @@ class DnacGroup(DnacRestClient):
   """Manage Groups
   """
 
+  def get_group_list(self):
+    """get all group
+
+    VERSION 1.2
+    '/api/v1/group'
+
+    Returns:
+        list -- list of all groups
+    """
+    api_path = '/api/v1/group'
+    get_result = self.get(api_path)
+    #   "data": {
+    #     "response": [
+    #       {
+    #         "parentId": "ba06348e-ee80-4058-bb23-f0c9a5fd728b",
+    return self.extract_data_response(get_result)
+
+
   def get_group_names(self):
     """get all group name
 
@@ -17,26 +35,15 @@ class DnacGroup(DnacRestClient):
     Returns:
         list -- list of all group name
     """
-
-    api_path = '/api/v1/group'
-    get_result = self.get(api_path)
-    if not get_result or get_result.get('failed'):
+    group_list = self.get_group_list()
+    if not group_list:
       return []
-
-    data = get_result.get('data')
-    #   "data": {
-    #     "response": [
-    #       {
-    #         "parentId": "ba06348e-ee80-4058-bb23-f0c9a5fd728b",
-    response = data.get('response')
-
-    group_names = [group.get('name') for group in response]
-
+    group_names = [group.get('name') for group in group_list]
     return group_names
 
 
   # lookup group_id by group_name
-  def get_group_id_by_name(self, drc, group_name):
+  def get_group_id_by_name(self, group_name):
     """lookup group id
 
     '/api/v1/group'
@@ -47,21 +54,16 @@ class DnacGroup(DnacRestClient):
     Returns:
         str -- group id
     """
-
     if not group_name or group_name.lower() == 'global':
       return '-1'
 
     api_path = '/api/v1/group'
-    get_result = drc.get(api_path)
-    if not get_result or get_result.get('failed', True):
-      return '0'
-
-    data = get_result.get('data')
-    response = data.get('response')
+    get_result = self.get(api_path)
     #   "data": {
     #     "response": [
     #       {
     #         "parentId": "ba06348e-ee80-4058-bb23-f0c9a5fd728b",
+    response = self.extract_data_response(get_result)
     if not response:
       return '0'
 
@@ -72,7 +74,7 @@ class DnacGroup(DnacRestClient):
     return '0'
 
 
-  def get_site_names(self, drc):
+  def get_site_names(self):
     """get all site name as dict
 
     VERSION 1.3
@@ -84,21 +86,19 @@ class DnacGroup(DnacRestClient):
     _cache = {}
 
     api_path = '/dna/intent/api/v1/site/count'
-    get_result = drc.get(api_path)
+    get_result = self.get(api_path)
     if not get_result or get_result.get('failed'):
       return {}
 
-    data = get_result.get('data')
-    count = data.get('response')
+    count = self.extract_data_response(get_result)
 
     STEP = 10
     for start in range(1, count + 1, STEP):
       api_path = '/dna/intent/api/v1/site?offset={}&limit={}'.format(start, STEP)
-      get_result = drc.get(api_path=api_path)
+      get_result = self.get(api_path=api_path)
       if not get_result or get_result.get('failed'):
         return {}
-      data = get_result.get('data')
-      sites = data.get('response')
+      sites = self.extract_data_response(get_result)
       for site in sites:
         logging.info("Caching %s", site['groupNameHierarchy'])
         _cache[site['groupNameHierarchy']] = site
@@ -109,7 +109,7 @@ class DnacGroup(DnacRestClient):
     return _cache
 
 
-  def process_group(self, drc, state='present', group_name='', group_type='area', parent_name='Global', building_info=None):
+  def process_group(self, state='present', group_name='', group_type='area', parent_name='Global', building_info=None):
     """[summary]
 
     '/api/v1/group'
@@ -117,16 +117,20 @@ class DnacGroup(DnacRestClient):
     group_type is a choice of "area", "building", "floor"
 
     Keyword Arguments:
-        state {str} -- [description] (default: {'present'})
-        group_name {str} -- [description] (default: {''})
-        group_type {str} -- [description] (default: {'area'})
-        parent_name {str} -- [description] (default: {'Global'})
+        state {str} -- 'present' or 'absent' (default: {'present'})
+        group_name {str} -- name of the group (default: {''})
+        group_type {str} -- 'area' or 'building' (default: {'area'})
+        parent_name {str} -- parent name (default: {'Global'})
         building_info {dict} -- [description] (default: {None})
     """
     result = {
       'failed': True,
       'changed': False
     }
+
+    if group_type == 'building' and building_info is None:
+      result['msg'] = "building_info is required to create group of building"
+      return result
 
     payload = {
       'groupTypeList': ["SITE"],
@@ -139,21 +143,16 @@ class DnacGroup(DnacRestClient):
     }
 
     if group_type == "building":
-      if not building_info:
-        building_info = {
-          'type': "building",
-          'address': "神奈川県川崎市中原区小杉町1-403",
-          'country': "Japan",
-          'latitude': "35.577510",
-          'longitude': "139.658149"
-        }
-
       payload['additionalInfo'][0]['attributes'].update(building_info)
 
-    group_name_list = drc.get_group_names()
+    # check if parent exists
+    group_name_list = self.get_group_names()
     has_group_name = group_name in group_name_list
     has_parent_name = parent_name in group_name_list
-    if not has_parent_name:
+    if has_parent_name:
+      parent_id = self.get_group_id_by_name(parent_name)
+      payload.update({'parentId' : parent_id})
+    else:
       result['msg'] = "there is no parent_name in group_name_list"
       return result
 
@@ -166,7 +165,7 @@ class DnacGroup(DnacRestClient):
       create_result = self.create_object(api_path=api_path, data=payload)
       result.update(create_result)
     elif state == 'absent' and has_group_name:
-      group_id = drc.get_group_id_by_name(group_name)
+      group_id = self.get_group_id_by_name(group_name)
       api_path = api_path + '/' + str(group_id)
       delete_result = self.delete_object(api_path=api_path)
       result.update(delete_result)
@@ -190,16 +189,16 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=logging.INFO)
 
-    params = sandbox_params.get('always-on-lab')
-    # params = sandbox_params.get('hardware-lab-2')
+    # params = sandbox_params.get('always-on-lab')
+    params = sandbox_params.get('hardware-lab')
 
+    # DnacRestClient class object
     drc = DnacGroup(params)
 
     test_dump_group(drc)
-    test_dump_group_by_name(drc)
-    test_group_names(drc)
-    test_group_id(drc)
-    test_process_group(drc)
+    # test_group_names(drc)
+    # test_group_id(drc)
+    # test_process_group(drc)
 
     return 0
 
@@ -209,22 +208,6 @@ if __name__ == '__main__':
     api_path = '/api/v1/group'
     get_result = drc.get(api_path)
     print(json.dumps(get_result, ensure_ascii=False, indent=2))
-
-
-  def test_dump_group_by_name(drc):
-    """test dump group by name"""
-    api_path = '/api/v1/group'
-    get_result = drc.get(api_path)
-    data = get_result.get('data')
-    group_list = data.get('response')
-
-    result = []
-    names = ['iida', 'ksg-tp', 'Floor 18']
-    for group in group_list:
-      if group.get('name') in names:
-        result.append(group)
-    for group in result:
-      print(json.dumps(group, ensure_ascii=False, indent=2))
 
 
   def test_group_names(drc):
@@ -242,9 +225,20 @@ if __name__ == '__main__':
 
   def test_process_group(drc):
     """test process_group()"""
+
+    # create area
     process_result = drc.process_group(state='present', group_name='iida', group_type='area', parent_name='Global', building_info=None)
     print(json.dumps(process_result, ensure_ascii=False, indent=2))
-    process_result = drc.process_group(state='present', group_name='ksg-tp', group_type='building', parent_name='iida', building_info=None)
+
+    # create building
+    building_info = {
+      'type': "building",
+      'address': "神奈川県川崎市中原区小杉町1-403",
+      'country': "Japan",
+      'latitude': "35.577510",
+      'longitude': "139.658149"
+    }
+    process_result = drc.process_group(state='present', group_name='ksg-tp', group_type='building', parent_name='iida', building_info=building_info)
     print(json.dumps(process_result, ensure_ascii=False, indent=2))
 
 
