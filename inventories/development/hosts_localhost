@@ -2,4 +2,13 @@
 # localhost
 #
 
+# pyenv environment
+# localhost ansible_connection=local ansible_python_interpreter=/Users/iida/.pyenv/shims/python3
+
+# or
+
+# install ansible and requests in global environemtn
+#   pyenv global system
+#   pip3 install ansible
+#   pip3 install requests
 localhost ansible_connection=local ansible_python_interpreter=/usr/local/bin/python3

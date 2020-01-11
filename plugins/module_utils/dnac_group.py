@@ -2,7 +2,11 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=missing-module-docstring
 
-from dnac_rest_client import DnacRestClient
+try:
+  from dnac_rest_client import DnacRestClient
+except ImportError:
+  from ansible_collections.iida.dnac.plugins.module_utils.dnac_rest_client import DnacRestClient
+
 
 class DnacGroup(DnacRestClient):
   """Manage Groups
@@ -46,6 +50,7 @@ class DnacGroup(DnacRestClient):
   def get_group_id_by_name(self, group_name):
     """lookup group id
 
+    VERSION 1.2
     '/api/v1/group'
 
     Arguments:
@@ -109,67 +114,80 @@ class DnacGroup(DnacRestClient):
     return _cache
 
 
-  def process_group(self, state='present', group_name='', group_type='area', parent_name='Global', building_info=None):
-    """[summary]
+  def process_group(self, state='present', group_name='', group_type='area', parent_name='Global', building_info=None, floor_info=None):
+    """create/delete group object
 
+    VERSION 1.2
     '/api/v1/group'
 
-    group_type is a choice of "area", "building", "floor"
+    To change group, delete group first and then create group again.
 
     Keyword Arguments:
         state {str} -- 'present' or 'absent' (default: {'present'})
         group_name {str} -- name of the group (default: {''})
-        group_type {str} -- 'area' or 'building' (default: {'area'})
+        group_type {str} -- 'area' or 'building' or 'floor' (default: {'area'})
         parent_name {str} -- parent name (default: {'Global'})
-        building_info {dict} -- [description] (default: {None})
+        building_info {dict} -- buiding info (default: {None})
     """
     result = {
       'failed': True,
       'changed': False
     }
 
-    if group_type == 'building' and building_info is None:
-      result['msg'] = "building_info is required to create group of building"
-      return result
+    api_path = '/api/v1/group'
 
-    payload = {
-      'groupTypeList': ["SITE"],
-      'name': group_name,
-      'additionalInfo': [
-        {
-          'nameSpace': "Location",
-          'attributes': {'type': group_type},
-        }]
-    }
-
-    if group_type == "building":
-      payload['additionalInfo'][0]['attributes'].update(building_info)
-
-    # check if parent exists
+    # check if group_name already exists in dna center
     group_name_list = self.get_group_names()
     has_group_name = group_name in group_name_list
-    has_parent_name = parent_name in group_name_list
-    if has_parent_name:
-      parent_id = self.get_group_id_by_name(parent_name)
-      payload.update({'parentId' : parent_id})
-    else:
-      result['msg'] = "there is no parent_name in group_name_list"
-      return result
-
-    api_path = '/api/v1/group'
 
     if state == 'present' and has_group_name:
       result['failed'] = False
       result['msg'] = "group_name {} already exists".format(group_name)
+
     elif state == 'present' and not has_group_name:
+      # newly create group
+      payload = {
+        'groupTypeList': ["SITE"],
+        'name': group_name,
+        'additionalInfo': [{
+          'nameSpace': "Location",
+          'attributes': {
+            'type': group_type
+          }
+        }]
+      }
+
+      # check if parent exists and update 'parentId'
+      has_parent_name = parent_name in group_name_list
+      if not has_parent_name:
+        result['msg'] = "there is no parent_name in group_name_list"
+        return result
+      parent_id = self.get_group_id_by_name(parent_name)
+      payload.update({'parentId' : parent_id})
+
+      # check if required parameter is provided
+      if group_type == "building":
+        if building_info is None:
+          result['msg'] = "building_info is required to create group of building"
+          return result
+        payload['additionalInfo'][0]['attributes'].update(building_info)
+      elif group_type == "floor":
+        if floor_info is None:
+          result['msg'] = "floor_info is required to create group of floor"
+        payload['additionalInfo'][0]['attributes'].update(floor_info)
+
       create_result = self.create_object(api_path=api_path, data=payload)
       result.update(create_result)
+
     elif state == 'absent' and has_group_name:
+      # delete it
       group_id = self.get_group_id_by_name(group_name)
-      api_path = api_path + '/' + str(group_id)
+      api_path = api_path + '/{}'.format(group_id)
       delete_result = self.delete_object(api_path=api_path)
       result.update(delete_result)
+
     elif state == 'absent' and not has_group_name:
+      # already deleted
       result['failed'] = False
       result['msg'] = "group_name {} is already absent".format(group_name)
 
@@ -189,16 +207,16 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=logging.INFO)
 
-    # params = sandbox_params.get('always-on-lab')
-    params = sandbox_params.get('hardware-lab')
+    params = sandbox_params.get('always-on-lab')
+    # params = sandbox_params.get('hardware-lab')
 
     # DnacRestClient class object
     drc = DnacGroup(params)
 
-    test_dump_group(drc)
+    # test_dump_group(drc)
     # test_group_names(drc)
     # test_group_id(drc)
-    # test_process_group(drc)
+    test_process_group_present(drc)
 
     return 0
 
@@ -223,24 +241,49 @@ if __name__ == '__main__':
     print(result)
 
 
-  def test_process_group(drc):
-    """test process_group()"""
+  def test_process_group_present(drc):
+    """test process_group(state='present')"""
 
     # create area
-    process_result = drc.process_group(state='present', group_name='iida', group_type='area', parent_name='Global', building_info=None)
+    process_result = drc.process_group(state='present', group_name='iida', group_type='area', parent_name='Global')
     print(json.dumps(process_result, ensure_ascii=False, indent=2))
 
     # create building
     building_info = {
       'type': "building",
       'address': "神奈川県川崎市中原区小杉町1-403",
-      'country': "Japan",
+      'country': "日本",
       'latitude': "35.577510",
       'longitude': "139.658149"
     }
     process_result = drc.process_group(state='present', group_name='ksg-tp', group_type='building', parent_name='iida', building_info=building_info)
     print(json.dumps(process_result, ensure_ascii=False, indent=2))
 
+    # create floor
+    floor_info = {
+      'rfModel': 0,
+      "width": 100,
+      "length": 100,
+      "height": 10
+    }
+    process_result = drc.process_group(state='present', group_name='ksg-tp-18f', group_type='floor', parent_name='ksg-tp', floor_info=floor_info)
+    print(json.dumps(process_result, ensure_ascii=False, indent=2))
 
-  # 実行
+
+  def test_process_group_absent(drc):
+    """test process_group(state='absent')"""
+
+    # delete floor
+    process_result = drc.process_group(state='absent', group_name='ksg-tp-18f')
+    print(json.dumps(process_result, ensure_ascii=False, indent=2))
+
+    # delete building
+    process_result = drc.process_group(state='absent', group_name='ksg-tp')
+    print(json.dumps(process_result, ensure_ascii=False, indent=2))
+
+    # delete area
+    process_result = drc.process_group(state='absent', group_name='iida')
+    print(json.dumps(process_result, ensure_ascii=False, indent=2))
+
+
   sys.exit(main())

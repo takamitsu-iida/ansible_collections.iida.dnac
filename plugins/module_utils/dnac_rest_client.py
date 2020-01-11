@@ -13,9 +13,9 @@
 
 """
 
-import datetime  # token expire date
-import fcntl  # process exclusion cotrol
-import functools  # decorator
+import datetime
+import fcntl
+import functools
 import time
 import json
 import logging
@@ -73,7 +73,7 @@ class DnacRestClient:
         params {dict} -- param dictionary
     """
 
-    logging.info('DnacRestClient created: %s', params.get('host'))
+    logging.info('DnacRestClient: %s', params.get('host'))
 
     # use this filename for app name
     app_name = os.path.splitext(os.path.basename(__file__))[0]

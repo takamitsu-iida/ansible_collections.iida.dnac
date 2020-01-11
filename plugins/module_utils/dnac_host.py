@@ -2,7 +2,11 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=missing-module-docstring
 
-from dnac_rest_client import DnacRestClient
+try:
+  from dnac_rest_client import DnacRestClient
+except ImportError:
+  from ansible_collections.iida.dnac.plugins.module_utils.dnac_rest_client import DnacRestClient
+
 
 class DnacHost(DnacRestClient):
   """Manage Network Hosts
@@ -46,8 +50,8 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=logging.INFO)
 
-    params = sandbox_params.get('always-on-lab')
-    # params = sandbox_params.get('hardware-lab-2')
+    # params = sandbox_params.get('always-on-lab')
+    params = sandbox_params.get('hardware-lab')
 
     # DnacRestClient object
     drc = DnacHost(params)

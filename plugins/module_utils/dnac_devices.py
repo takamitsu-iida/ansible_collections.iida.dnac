@@ -2,7 +2,11 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=missing-module-docstring
 
-from dnac_rest_client import DnacRestClient
+try:
+  from dnac_rest_client import DnacRestClient
+except ImportError:
+  from ansible_collections.iida.dnac.plugins.module_utils.dnac_rest_client import DnacRestClient
+
 
 class DnacDevices(DnacRestClient):
   """Manage Network Devices
@@ -67,8 +71,11 @@ class DnacDevices(DnacRestClient):
     return self.extract_data_response(get_result)
 
 
-  def assign_devices(self, site_id, device_list):
+  def assign_device_to_site(self, site_id, device_list):
     """assign devices to site
+
+    Cisco DNA Center Release: 1.3.0.x
+    '/dna/system/api/v1/site/{site_id}/device'
 
     Arguments:
         site_id {[type]} -- [description]
@@ -110,6 +117,7 @@ class DnacDevices(DnacRestClient):
       }]
     }
 
+    api_path = '/dna/system/api/v1/site/{}/device'.format(site_id)
     api_path = '/dna/intent/api/v1/site/{}/device'.format(site_id)
     response = self.post(api_path=api_path, data=payload)
     print(json.dumps(response, indent=2))
