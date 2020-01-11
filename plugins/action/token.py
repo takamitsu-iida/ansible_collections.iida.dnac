@@ -27,6 +27,7 @@ class ActionModule(DnaActionModule):
   def run(self, tmp=None, task_vars=None):
     del tmp  # tmp no longer has any effect
 
+    # if delegate_to is specified, we must run in module
     run_as_module = bool(hasattr(self._play_context, 'delegate_to'))
 
     #

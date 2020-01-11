@@ -7,7 +7,7 @@
 
 # or
 
-# install ansible and requests in global environemtn
+# install ansible and requests in global environemnt
 #   pyenv global system
 #   pip3 install ansible
 #   pip3 install requests
