@@ -37,6 +37,8 @@ except ImportError as e:
   import base64  # decode jwt by hand
   HAS_JWT = False
 
+logger = logging.getLogger(__name__)
+
 
 class DnacRestClient:
   """Common operation to access to cisco dna center via rest api.

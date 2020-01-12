@@ -2,10 +2,16 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=missing-module-docstring
 
+import logging
+
+# import tabulate  # https://pypi.org/project/tabulate/
+
 try:
   from dnac_rest_client import DnacRestClient
 except ImportError:
   from ansible_collections.iida.dnac.plugins.module_utils.dnac_rest_client import DnacRestClient
+
+logger = logging.getLogger(__name__)
 
 
 class DnacGroup(DnacRestClient):
@@ -197,7 +203,6 @@ class DnacGroup(DnacRestClient):
 if __name__ == '__main__':
 
   import json
-  import logging
   import sys
 
   from dnac_sandbox import sandbox_params

@@ -2,15 +2,17 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=missing-module-docstring
 
+import logging
 import datetime
 
-import tabulate
+import tabulate  # https://pypi.org/project/tabulate/
 
 try:
   from dnac_rest_client import DnacRestClient
 except ImportError:
   from ansible_collections.iida.dnac.plugins.module_utils.dnac_rest_client import DnacRestClient
 
+logger = logging.getLogger(__name__)
 
 class DnacPathTrace(DnacRestClient):
   """Manage Path Trace
@@ -48,8 +50,13 @@ class DnacPathTrace(DnacRestClient):
 
 
   def show_path_trace(self, path_trace=None):
+    """Print path_trace
+
+    Keyword Arguments:
+        path_trace {dict} -- Object of the path_trace (default: {None})
+    """
     if path_trace is None:
-      print("no path_trace found.")
+      logger.error("no path_trace found to show path trace")
       return
 
     # print(json.dumps(path_trace, indent=2))
@@ -76,7 +83,7 @@ class DnacPathTrace(DnacRestClient):
         path_trace_list {list} -- List of path trace object
     """
     if not path_trace_list:
-      print("no path_trace found.")
+      logger.error("no path_trace found to show the list of path trace")
       return
 
     # sort by createTime
@@ -104,9 +111,65 @@ class DnacPathTrace(DnacRestClient):
     print(tabulate.tabulate(table, headers, tablefmt='simple'))
 
 
+  def create_path_trace(self, src_ip=None, dst_ip=None, src_port=None, dst_port=None):
+    """Initiate a new Pathtrace
+
+    version 1.2
+    /dna/intent/api/v1/flow-analysis
+
+    Keyword Arguments:
+        src_ip {str} -- [description] (default: {None})
+        dst_ip {str} -- [description] (default: {None})
+        src_port {str} -- [description] (default: {None})
+        dst_port {str} -- [description] (default: {None})
+
+    Returns:
+        [type] -- [description]
+    """
+    if not all((src_ip, dst_ip)):
+      logger.error('src_ip and dst_ip are required to create path trace')
+      return
+
+    payload = {
+      'sourceIP': src_ip,
+      'destIP': dst_ip,
+      'periodicRefresh': False,
+      'inclusions': ['INTERFACE-STATS', 'DEVICE-STATS']
+    }
+
+    if src_port is not None:
+      payload['sourcePort'] = src_port
+
+    if dst_port is not None:
+      payload['destPort'] = dst_port
+
+    api_path = '/dna/intent/api/v1/flow-analysis'
+
+    post_result = self.post(api_path=api_path, data=payload)
+    if post_result.get('failed'):
+      status_code = post_result.get('status_code')
+      if status_code == 403:
+        logging.error('The server recognizes the authentication credentials, but the client is not authorized to perform this request.')
+      elif status_code == 404:
+        logging.error('The client made a request for a resource that does not exist.')
+      elif status_code == 409:
+        logging.error('The target resource is in a conflicted state (for example, an edit conflict where a resource is being edited by multiple users). Retrying the request later might succeed.')
+      elif status_code == 415:
+        logging.error('The client sent a request body in a format that the server does not support')
+      return
+
+    data = self.extract_data_response(post_result)
+    task_id = data.get('taskId')
+    wait_result = self.wait_for_task(task_id)
+    if wait_result.get('failed'):
+      logger.error('wait failed')
+      return
+
+    logger.info(wait_result.get('progress'))
+
+
 if __name__ == '__main__':
 
-  import logging
   import sys
 
   from dnac_sandbox import sandbox_params
@@ -133,7 +196,10 @@ if __name__ == '__main__':
     path_trace = drc.get_path_trace_by_id(path_trace_id)
     drc.show_path_trace(path_trace)
 
-
+    # create a new path trace
+    src_ip = '10.10.20.81'
+    dst_ip = '10.10.20.82'
+    drc.create_path_trace(src_ip=src_ip, dst_ip=dst_ip)
 
     return 0
 
