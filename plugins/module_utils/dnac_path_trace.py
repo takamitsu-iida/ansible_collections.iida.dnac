@@ -153,7 +153,7 @@ class DnacPathTrace(DnacRestClient):
       elif status_code == 404:
         logging.error('The client made a request for a resource that does not exist.')
       elif status_code == 409:
-        logging.error('The target resource is in a conflicted state (for example, an edit conflict where a resource is being edited by multiple users). Retrying the request later might succeed.')
+        logging.error('The target resource is in a conflicted state. Retrying the request later might succeed.')
       elif status_code == 415:
         logging.error('The client sent a request body in a format that the server does not support')
       return
