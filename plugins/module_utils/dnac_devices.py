@@ -420,7 +420,7 @@ if __name__ == '__main__':
     intf = drc.get_device_interfaces_by_name(device_id=device_id, name='GigabitEthernet0/0/1')
     drc.show_device_interfaces([intf])
 
-    # get licenses and show it
+    # get licenses of the device and show it
     license_list = drc.get_device_licenses(device_id=device_id)
     drc.show_device_licenses(license_list)
 
