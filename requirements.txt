@@ -1,0 +1,5 @@
+                # in development environemt
+                #---------------------------
+ansible         # ==2.9.2
+requests        # ==2.22.0
+tabulate        # ==0.8.6

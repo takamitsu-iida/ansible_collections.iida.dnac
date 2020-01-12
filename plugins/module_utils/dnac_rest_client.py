@@ -423,7 +423,9 @@ class DnacRestClient:
     result = self.get_token_from_network()
     if result.get('failed'):
       print('NG')
+      return False
     print('OK')
+    return True
 
 
   def parse_jwt(self, token):
@@ -846,42 +848,23 @@ class DnacRestClient:
 
 if __name__ == '__main__':
 
+  from dnac_sandbox import sandbox_params
+
+
   def main():
     """main function for test"""
 
     logging.basicConfig(level=logging.INFO)
 
-    # Cisco DevNet Sandbox version 1.2.10 readonly
-    _params_readonly = {
-      'host': 'sandboxdnac2.cisco.com',
-      'port': 443,
-      'username': 'devnetuser',
-      'password': 'Cisco123!',
-      'timeout': 30,
-      'log_dir': './log',
-      'http_proxy': ''  ## http://username:password@proxy-url:8080
-    }
-
-    _params_reserved = {
-      'host': '10.10.20.85',
-      'port': 443,
-      'username': 'admin',
-      'password': 'Cisco1234!',
-      'timeout': 30,
-      'log_dir': './log',
-      'http_proxy': ''  ## http://username:password@proxy-url:8080
-    }
-
-    HAS_RESERVATION = False
-    params = _params_reserved if HAS_RESERVATION else _params_readonly
+    params = sandbox_params.get('always-on-lab')
+    # params = sandbox_params.get('hardware-lab')
 
     drc = DnacRestClient(params)
 
-    # test_token(drc)
-    # test_api_path(drc)
+    if not drc.ping():
+      return -1
 
-    r = drc.get_host_by_mac(mac="f0:25:72:2a:d2:41")
-    print(json.dumps(r, ensure_ascii=False, indent=2))
+    test_api_path(drc)
 
     return 0
 
@@ -910,8 +893,8 @@ if __name__ == '__main__':
       # '/api/v1/group',
       # '/api/v1/group/count',  # all group include area, building, floor, ...
       # '/api/v1/group/ce4745ec-d99b-4d12-b008-5ad6513b09c3'  # group/{{ id }} returns specific group object
-      '/api/v1/host',
-      '/api/v1/host?hostIp=10.10.20.83'
+      # '/api/v1/host',
+      # '/api/v1/host?hostIp=10.10.20.83'
     ]
     for api_path in api_path_list:
       get_result = drc.get(api_path=api_path)
