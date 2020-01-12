@@ -1,10 +1,9 @@
 ---
 
 #
-# Access to Cisco DNA Center REST API
+# Cisco DNA Center REST API
 #
 
-# 2019/12/07
 # Takamitsu IIDA (@takamitsu-iida)
 
 - name: access to cisco dna center rest api
@@ -13,6 +12,7 @@
 
   tasks:
     - name: get auth token
+      # delegate_to: bastion
       iida.dnac.token:
       register: r
 

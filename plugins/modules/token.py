@@ -1,6 +1,6 @@
 #!/usr/bin/python
-# pylint: disable=C0111
 # -*- coding: utf-8 -*-
+# pylint: disable=missing-module-docstring
 
 # (c) 2019, Takamitsu IIDA (@takamitsu-iida)
 
@@ -12,7 +12,7 @@ module: iida.dnac.token
 
 version_added: 2.9
 
-short_description: Get REST API authentication token from DNA Center
+short_description: Get authentication token from Cisco DNA Center
 
 description:
   - Get REST API authentication token from DNA Center
@@ -25,9 +25,30 @@ notes:
 '''
 
 EXAMPLES = '''
+- name: access to cisco dna center rest api
+  hosts: sandboxdnac2
+  gather_facts: False
+
+  tasks:
+    - name: get auth token
+      iida.dnac.token:
+      register: r
+
+    - debug:
+        var: r
 '''
 
 RETURN = '''
+response:
+  description: authentication token string
+  returned: when token the returned from dna center
+  type: str
+  sample: |
+    {
+      "changed": false,
+      "failed": false,
+      "token": "eyJ0eXAiOiJKV1QiLCJhb...snipped..."
+    }
 '''
 
 from ansible.module_utils.basic import AnsibleModule
@@ -47,31 +68,32 @@ def main():
     timeout=dict(default=DnacRestClient.DEFAULT_TIMEOUT, type='int'),
     http_proxy=dict(default='', type='str'),
     log=dict(default=False, type='bool'),
-    log_dir=dict(default='', type='str'),
     debug=dict(default=False, type='bool')
   )
 
   # generate module instance
   module = AnsibleModule(argument_spec=argument_spec, supports_check_mode=True)
 
+  # generate DnacRestClient instance
   drc = DnacRestClient(module.params)
 
   result = {
-    'changed': False,
-    'failed': False
+    'changed': False
   }
 
+  if module.check_mode:
+    module.warn('Get token operation is not restricted by check_mode')
+
+  # get token
   token = drc.get_token()
+
+  # set token to result
   if token:
     result['token'] = token
-  else:
-    result['token'] = ''
-    result['failed'] = True
+    module.exit_json(**result)
 
-  if result.get('failed'):
-    module.fail_json(**result)
-
-  module.exit_json(**result)
+  result['failed'] = True
+  module.fail_json(**result)
 
 
 if __name__ == '__main__':

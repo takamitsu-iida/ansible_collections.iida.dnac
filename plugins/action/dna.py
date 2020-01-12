@@ -45,12 +45,12 @@ class DnaActionModule(ActionModule):
   def complement_task_args_by_hostvars(self, hostvars):
     """complement self._task.args by inventory hostvars
 
+    If task parameters are not provided in playbook,
+    complement it by inventoriy hostvars
+
     Arguments:
         hostvars {dict} -- hostvars
     """
-    #
-    # if task in playbook does not specify parameters, complement it using inventoriy hostvars
-    #
     if not self._task.args.get('host'):
       self._task.args['host'] = hostvars.get('remote_addr') or hostvars.get('ansible_ssh_host') or hostvars.get('ansible_host')
 

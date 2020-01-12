@@ -6,7 +6,6 @@
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
-
 import os
 
 # import from collection
@@ -59,19 +58,21 @@ class ActionModule(DnaActionModule):
         'failed': False
       }
 
+      if self._play_context.check_mode:
+        result['warnings'] = "Get token operation is not restricted by check_mode"
+
       token = drc.get_token()
       if token:
         result['token'] = token
       else:
-        result['token'] = ''
         result['failed'] = True
 
     #
     # post process
     #
 
-    if self._task.args.get('log') and result.get('__log__'):
-      log_path = self.write_log(inventory_hostname, result['__log__'])
+    if self._task.args.get('log') and '__log__' in result:
+      log_path = self.write_log(inventory_hostname, result.get('__log__'))
       result['log_path'] = log_path
       del result['__log__']
 

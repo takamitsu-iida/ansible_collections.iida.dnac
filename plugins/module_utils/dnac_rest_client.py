@@ -918,5 +918,4 @@ if __name__ == '__main__':
       print(json.dumps(get_result, ensure_ascii=False, indent=2))
 
 
-  # 実行
   sys.exit(main())

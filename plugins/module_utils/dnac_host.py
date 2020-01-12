@@ -62,5 +62,5 @@ if __name__ == '__main__':
 
     return 0
 
-  # 実行
+
   sys.exit(main())
