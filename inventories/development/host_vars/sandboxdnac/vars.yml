@@ -1,5 +1,0 @@
----
-
-ansible_user: "{{ vault_user | default('devnetuser') }}"
-ansible_password: "{{ vault_pass | default('Cisco123!') }}"
-ansible_port: 443

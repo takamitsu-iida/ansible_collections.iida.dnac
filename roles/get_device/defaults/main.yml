@@ -1,0 +1,11 @@
+---
+
+# path of the log directory
+# LOG_DIR: "{{ role_path + '/log' }}"
+LOG_DIR: "{{ lookup('env', 'PWD') + '/log' }}"
+
+#
+# template module
+#
+OUTPUT_ENCODING: 'utf_8_sig'
+NEWLINE_SEQUENCE: \r\n

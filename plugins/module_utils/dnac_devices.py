@@ -4,7 +4,12 @@
 
 import logging
 
-import tabulate  # https://pypi.org/project/tabulate/
+try:
+  # https://pypi.org/project/tabulate/
+  HAS_TABULATE = True
+  import tabulate
+except ImportError:
+  HAS_TABULATE = False
 
 try:
   from dnac_rest_client import DnacRestClient
@@ -38,6 +43,9 @@ class DnacDevices(DnacRestClient):
       if not device_list:
         print("no device found.")
         return
+    if not HAS_TABULATE:
+      print("tabulate module not found.")
+      return
 
     headers = ['hostname', 'mgmt ip', 'serial', 'platform', 'version', 'role', 'uptime']
     table = []
@@ -153,6 +161,11 @@ class DnacDevices(DnacRestClient):
     if not device:
       print('no device information found.')
       return
+
+    if not HAS_TABULATE:
+      print("tabulate module not found.")
+      return
+
     # print(json.dumps(device, ensure_ascii=False, indent=2))
 
     def get_row(key):
@@ -207,6 +220,10 @@ class DnacDevices(DnacRestClient):
     """
     if not license_list:
       print('no license information found.')
+      return
+
+    if not HAS_TABULATE:
+      print("tabulate module not found.")
       return
 
     headers = ['name', 'status', 'type', 'maxUsageCount', 'usageCountRemaining']
@@ -295,6 +312,10 @@ class DnacDevices(DnacRestClient):
       print("no interface found.")
       return
 
+    if not HAS_TABULATE:
+      print("tabulate module not found.")
+      return
+
     # sort by portName
     intf_list = sorted(intf_list, key=lambda port: port.get('portName'))
 
@@ -379,6 +400,52 @@ class DnacDevices(DnacRestClient):
     api_path = '/dna/intent/api/v1/site/{}/device'.format(site_id)
     response = self.post(api_path=api_path, data=payload)
     print(json.dumps(response, indent=2))
+
+
+  def execute_module_get_devices(self, check_mode=False):
+    """execute ansible module
+
+    Keyword Arguments:
+        check_mode {bool} -- Check mode or not (default: {False})
+
+    Returns:
+        dict -- Object of the result
+    """
+    result = {
+      'changed': False,
+      'failed': False
+    }
+
+    if check_mode:
+      result['warnings'] = "Get devices operation is not restricted by check_mode"
+
+    device_ip = self.params.get('ip')
+    device_id = self.params.get('id')
+    device_serial = self.params.get('serial')
+
+    device = None
+    device_list = None
+
+    if any([device_ip, device_id, device_serial]):
+      if device_ip:
+        device = self.get_device_by_ip(device_ip)
+      elif device_id:
+        device = self.get_device_by_id(device_id)
+      elif device_serial:
+        device = self.get_device_by_serial(device_serial)
+      if device:
+        result['device_list'] = [device]
+      else:
+        result['failed'] = True
+    else:
+      device_list = self.get_device_list()
+      if device_list:
+        result['device_list'] = device_list
+      else:
+        result['failed'] = True
+
+    return result
+
 
 
 if __name__ == '__main__':

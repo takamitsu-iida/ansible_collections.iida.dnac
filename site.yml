@@ -18,3 +18,19 @@
 
     - debug:
         var: r
+
+- name: get devices from cisco dna center
+  hosts: sandboxdnac2
+  gather_facts: False
+
+  tasks:
+    - name: get device list
+      # delegate_to: bastion
+      iida.dnac.get_devices:
+      register: r
+
+    - debug:
+        var: r
+
+
+

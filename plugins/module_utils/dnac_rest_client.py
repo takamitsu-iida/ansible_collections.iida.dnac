@@ -53,10 +53,22 @@ class DnacRestClient:
   DEFAULT_CHECKMODE = False
   DEFAULT_TIMEOUT = 30  # timeout used in requests module, default is 30 sec
 
-
   # parameters for async operation
   RETRY_INTERVAL = 2
   MAX_RETRY_COUNT = 10
+
+  # common argument for ansible module
+  argument_spec = dict(
+    host=dict(type='str', required=True),
+    port=dict(default=443, type='int'),
+    username=dict(type='str'),
+    password=dict(type='str'),
+    timeout=dict(default=30, type='int'),
+    http_proxy=dict(type='str'),
+    log=dict(default=False, type='bool'),
+    log_dir=dict(type='path'),
+    debug=dict(default=False, type='bool'))
+
 
   def __init__(self, params):
     """constructor for DnacRestClient class
@@ -76,6 +88,9 @@ class DnacRestClient:
     """
 
     logging.info('DnacRestClient: %s', params.get('host'))
+
+    # store params
+    self.params = params
 
     # use this filename for app name
     app_name = os.path.splitext(os.path.basename(__file__))[0]
@@ -844,6 +859,32 @@ class DnacRestClient:
       create_result = self.create_object(api_path=api_path, data=want_settings)
       if create_result:
         result.update(create_result)
+
+    return result
+
+
+  def execute_module_token(self, check_mode=False):
+    """execute ansible module
+
+    Keyword Arguments:
+        check_mode {bool} -- Check mode or not (default: {False})
+
+    Returns:
+        dict -- Object of the result
+    """
+    result = {
+      'changed': False,
+      'failed': False
+    }
+
+    if check_mode:
+      result['warnings'] = "Get token operation is not restricted by check_mode"
+
+    token = self.get_token()
+    if token:
+      result['token'] = token
+    else:
+      result['failed'] = True
 
     return result
 

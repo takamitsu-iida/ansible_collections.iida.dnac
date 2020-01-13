@@ -10,7 +10,7 @@ import os
 
 # import from collection
 from ansible_collections.iida.dnac.plugins.action.dna import DnaActionModule
-from ansible_collections.iida.dnac.plugins.module_utils.dnac_rest_client import DnacRestClient
+from ansible_collections.iida.dnac.plugins.module_utils.dnac_devices import DnacDevices as DnacRestClient
 
 try:
   # pylint: disable=unused-import
@@ -52,7 +52,7 @@ class ActionModule(DnaActionModule):
       result = super(ActionModule, self).run(task_vars=task_vars)
     else:
       drc = DnacRestClient(self._task.args)
-      result = drc.execute_module_token(self._play_context.check_mode)
+      result = drc.execute_module_get_devices(self._play_context.check_mode)
 
     #
     # post process
