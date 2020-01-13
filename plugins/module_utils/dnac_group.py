@@ -52,6 +52,26 @@ class DnacGroup(DnacRestClient):
     return group_names
 
 
+  def get_group_by_name(self, group_name):
+    """グループの情報を全部取ってから、フィルタリングした結果を返す。
+
+    version1.2
+
+    Arguments:
+        group_name {[type]} -- [description]
+
+    Returns:
+        [type] -- [description]
+    """
+    group_list = self.get_group_list()
+    if not group_list:
+      return None
+    matched = [group for group in group_list if group.get('name') == group_name]
+    if len(matched) > 0:
+      return matched[0]
+    return None
+
+
   # lookup group_id by group_name
   def get_group_id_by_name(self, group_name):
     """lookup group id
@@ -65,7 +85,7 @@ class DnacGroup(DnacRestClient):
     Returns:
         str -- group id
     """
-    if not group_name or group_name.lower() == 'global':
+    if not group_name:
       return '-1'
 
     api_path = '/api/v1/group'
@@ -85,7 +105,7 @@ class DnacGroup(DnacRestClient):
     return '0'
 
 
-  def get_site_names(self):
+  def get_site_names_13(self):
     """get all site name as dict
 
     VERSION 1.3
@@ -120,13 +140,15 @@ class DnacGroup(DnacRestClient):
     return _cache
 
 
-  def process_group(self, state='present', group_name='', group_type='area', parent_name='Global', building_info=None, floor_info=None):
+  def process_group(self, state='present', group_name='', group_type='area', parent_name='Global', building_info=None):
     """create/delete group object
 
     VERSION 1.2
     '/api/v1/group'
 
     To change group, delete group first and then create group again.
+
+    floor is not supported yet.
 
     Keyword Arguments:
         state {str} -- 'present' or 'absent' (default: {'present'})
@@ -177,11 +199,23 @@ class DnacGroup(DnacRestClient):
           result['msg'] = "building_info is required to create group of building"
           return result
         payload['additionalInfo'][0]['attributes'].update(building_info)
-      elif group_type == "floor":
-        if floor_info is None:
-          result['msg'] = "floor_info is required to create group of floor"
-        payload['additionalInfo'][0]['attributes'].update(floor_info)
 
+      elif group_type == "floor":
+        payload['additionalInfo'].append({
+          'nameSpace': "mapsSummary",
+          'attributes': {
+            'rfModel': "37037",
+            'floorIndex': "1"
+          }
+        })
+        payload['additionalInfo'].append({
+          'nameSpace': "mapGeometry",
+          'attributes': {
+            'width': "100",
+            'length': "100",
+            'height': "10"
+          }
+        })
       create_result = self.create_object(api_path=api_path, data=payload)
       result.update(create_result)
 
@@ -213,7 +247,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
 
     params = sandbox_params.get('always-on-lab')
-    # params = sandbox_params.get('hardware-lab')
+    params = sandbox_params.get('hardware-lab')
 
     # DnacRestClient class object
     drc = DnacGroup(params)
@@ -222,6 +256,7 @@ if __name__ == '__main__':
     # test_group_names(drc)
     # test_group_id(drc)
     test_process_group_present(drc)
+    # test_process_group_absent(drc)
 
     return 0
 
@@ -265,14 +300,9 @@ if __name__ == '__main__':
     print(json.dumps(process_result, ensure_ascii=False, indent=2))
 
     # create floor
-    floor_info = {
-      'rfModel': 0,
-      "width": 100,
-      "length": 100,
-      "height": 10
-    }
-    process_result = drc.process_group(state='present', group_name='ksg-tp-18f', group_type='floor', parent_name='ksg-tp', floor_info=floor_info)
+    process_result = drc.process_group(state='present', group_name='ksg-tp-18f', group_type='floor', parent_name='ksg-tp')
     print(json.dumps(process_result, ensure_ascii=False, indent=2))
+
 
 
   def test_process_group_absent(drc):

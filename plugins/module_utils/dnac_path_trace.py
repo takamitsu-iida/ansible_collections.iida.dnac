@@ -2,10 +2,15 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=missing-module-docstring
 
+import json
 import logging
 import datetime
 
-import tabulate  # https://pypi.org/project/tabulate/
+try:
+  HAS_TABULATE = True
+  import tabulate
+except ImportError:
+  HAS_TABULATE = False
 
 try:
   from dnac_rest_client import DnacRestClient
@@ -168,6 +173,13 @@ class DnacPathTrace(DnacRestClient):
     logger.info(wait_result.get('progress'))
 
 
+  def delete_path_trace_by_id(self, path_trace_id=None):
+    api_path = '/dna/intent/api/v1/flow-analysis/{}'.format(path_trace_id)
+    delete_result = self.delete_object(api_path)
+    json.dumps(delete_result, indent=2)
+
+
+
 if __name__ == '__main__':
 
   import sys
@@ -179,8 +191,8 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=logging.INFO)
 
-    params = sandbox_params.get('hardware-lab')
     params = sandbox_params.get('always-on-lab')
+    params = sandbox_params.get('hardware-lab')
 
     # DnacRestClient object
     drc = DnacPathTrace(params)
@@ -189,17 +201,25 @@ if __name__ == '__main__':
     path_trace_list = drc.get_path_trace()
     drc.show_path_trace_list(path_trace_list)
 
-    # for example
-    # select first path_trace object
-    path_trace_id = path_trace_list[0].get('id')
-    path_trace_id = '7916708d-be09-40d9-b73f-0b71eb9575b0'
-    path_trace = drc.get_path_trace_by_id(path_trace_id)
-    drc.show_path_trace(path_trace)
+    # # for example
+    # # select first path_trace object
+    # path_trace_id = path_trace_list[0].get('id')
+    # path_trace_id = '7916708d-be09-40d9-b73f-0b71eb9575b0'
+    # path_trace = drc.get_path_trace_by_id(path_trace_id)
+    # drc.show_path_trace(path_trace)
 
     # create a new path trace
     src_ip = '10.10.20.81'
     dst_ip = '10.10.20.82'
-    drc.create_path_trace(src_ip=src_ip, dst_ip=dst_ip)
+    # drc.create_path_trace(src_ip=src_ip, dst_ip=dst_ip)
+
+    # get path_trace list
+    path_trace_list = drc.get_path_trace()
+    drc.show_path_trace_list(path_trace_list)
+
+    # drc.delete_path_trace_by_id(path_trace_id='b95f7fcd-31d9-4f4a-9d94-1c0a5181de6e')
+    # drc.delete_path_trace_by_id(path_trace_id='4f9f5ca5-a8d7-49a8-a038-278fd5576049')
+    # drc.delete_path_trace_by_id(path_trace_id='4dc87a90-bbfb-4922-94dc-64bcb8e06ce6')
 
     return 0
 

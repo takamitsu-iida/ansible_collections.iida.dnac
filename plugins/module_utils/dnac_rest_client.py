@@ -402,6 +402,8 @@ class DnacRestClient:
       'token': ''
     }
 
+    logging.info("POST %s", url)
+
     r = None
     try:
       r = requests.post(url, timeout=timeout, proxies=proxies, headers=headers, auth=auth, verify=False)
@@ -420,6 +422,8 @@ class DnacRestClient:
 
     if r is None:
       return result
+
+    logging.info("%s %s", r.status_code, r.url)
 
     if not r.ok:
       result['msg'] = 'status code: ' + str(r.status_code)

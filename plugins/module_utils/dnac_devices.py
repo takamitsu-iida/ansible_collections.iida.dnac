@@ -351,7 +351,7 @@ class DnacDevices(DnacRestClient):
   def assign_device_to_site(self, site_id, device_list):
     """assign devices to site
 
-    NOT TESTET YES
+    NOT TESTED
 
     version 1.3
     /dna/system/api/v1/site/{site_id}/device
