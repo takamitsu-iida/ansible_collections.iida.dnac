@@ -1,16 +1,22 @@
 ---
 
-- name: SET_FACT CURRENT DATETIME
+# preflight setting
+
+- name: set_fact current datetime
   set_fact:
     # 2020-01-13@11-16-03
     _date: "{{ lookup('pipe', 'date +%Y-%m-%d@%H-%M-%S') }}"
 
-- name: SET_FACT LOG FILENAME
+- name: set_fact log filename
   set_fact:
     _filename: "{{ inventory_hostname + '_' + role_name|basename + '_' + _date }}"
 
+# ログの保存場所を変更するならここで指定
+- name: set_fact log directory name
+  set_fact:
+    _logdir: "{{ LOG_DIR }}"  # + LOG_SUBDIR }}"
 
-- name: CREATE LOG DIRECTORY IF NOT EXISTS
+- name: create log directory if not exists
   delegate_to: localhost
   file:
     path: "{{ LOG_DIR }}"
@@ -22,23 +28,24 @@
 # 装置に乗り込んでコマンドを実行する。
 # 失敗した場合に備えてblock rescueを使う。
 #
-- block:
-    - name: RUN EXEC COMMANDS ON REMOTE NODES OVER SSH
+-
+  block:
+    - name: get a list of devices
       iida.dnac.get_devices:
-        commands: "{{ CMD_LIST }}"
+        # - ip: 10.10.20.81
+        # - id: ''
+        # - serial: ''
       register: result
-      when:
-        - (ansible_connection is defined) and (ansible_connection == 'network_cli')
 
-    - name: SET_FACT result.stdout AS NAME stdout
+    - name: set_fact device_list
       set_fact:
-        stdout: "{{ result.stdout }}"
-        sysinfo_failed: false
+        _device_list: "{{ result.device_list }}"
+        _get_failed: false
       when:
-        - "'stdout' in result"
+        - "'device_list' in result"
 
   rescue:
-    - name: SAVE FAILED LOG
+    - name: save failed log
       delegate_to: localhost
       copy:
         content: "{{ result | to_nice_json(indent=2) }}"
@@ -46,110 +53,17 @@
       vars:
         - ext: '.txt'
 
-    - name: SET_FACT failed
+    - name: set_fact failed
       set_fact:
-        _sysinfo_failed: true
-
-    # ここで止めたい場合のみ
-    # - name: STOP IF ERROR OCCURED
-    #   fail:
-    #     msg: "Failed to execute command on remote device {{ inventory_hostname }}"
+        _get_failed: true
 
 
-# 以下stdoutをset_factできた場合のみ実行する
+# 以下set_factできた場合のみ実行するためにblockの最後にこれを付与する
+#
 # when:
-#   - stdout is defined
+#   - device_list is defined
 #
 - block:
-
-    #
-    # コマンド出力をファイルに保存します
-    #
-    - name: SAVE COMMAND OUTPUT TO LOGFILE
-      delegate_to: localhost
-      copy:
-        content: |
-          {% for item in CMD_LIST -%}
-
-          === {{ item }} ===
-          {{ stdout[loop.index0] }}
-          {% endfor %}
-        dest: "{{ _logdir + '/' + _filename + '.txt' }}"
-
-    # この順番であることを前提に、それぞれ個別のファイルも作っておく
-    # CMD_LIST:
-    # - show system info
-    # - diff startup-config running-config
-    # - show startup-config
-    # - show running-config
-    # - show logging syslog
-
-    - name: SAVE show startup-config
-      delegate_to: localhost
-      copy:
-        content: "{{ stdout[INDEX] }}"
-        dest: "{{ _logdir + '/' + _filename + '_startup.txt' }}"
-      vars:
-        - INDEX: 2
-
-    - name: SAVE show running-config
-      delegate_to: localhost
-      copy:
-        content: "{{ stdout[INDEX] }}"
-        dest: "{{ _logdir + '/' + _filename + '_running.txt' }}"
-      vars:
-        - INDEX: 3
-
-    - name: SAVE show logging
-      delegate_to: localhost
-      copy:
-        content: "{{ stdout[INDEX] }}"
-        dest: "{{ _logdir + '/' + _filename + '_logging.txt' }}"
-      vars:
-        - INDEX: 4
-
-    #
-    # 改行コードをreplaceモジュールで変更する
-    # もともとのstdoutの改行コードは\nであると仮定
-    #
-    - name: LF to CRLF
-      delegate_to: localhost
-      replace:
-        dest: "{{ item }}"
-        regexp: '\n'
-        replace: '\r\n'
-      with_items:
-        - "{{ _logdir + '/' + _filename + '.txt' }}"
-        - "{{ _logdir + '/' + _filename + '_startup.txt' }}"
-        - "{{ _logdir + '/' + _filename + '_running.txt' }}"
-        - "{{ _logdir + '/' + _filename + '_logging.txt' }}"
-      ignore_errors: true
-
-    #
-    # show system infoの出力をNTC-TEMPLATEでオブジェクト化し、set_factしておきます
-    #
-    - name: SET_FACT PARSED show system info
-      set_fact:
-        _sysinfo: "{{ stdout[INDEX] | parse_cli_textfsm(NTC_PATH) }}"
-      vars:
-        INDEX: 0
-        NTC_PATH: "{{ NTC_PATH_SYSINFO }}"
-
-    #
-    # diff startup-config running-configの出力をset_factしておきます
-    #
-    - name: SET_FACT diff startup-config running-config
-      set_fact:
-        _diff: "{% if stdout[INDEX] %}差分あり{% else %}差分なし{% endif %}"
-        _diff_text: "{{ stdout[INDEX] }}"
-      vars:
-        INDEX: 1
-
-    # - debug:
-    #     var: _sysinfo
-
-    # - debug:
-    #     var: "{{ lookup('template', 'show_system_info.j2') }}"
 
     # CSVファイルを作成する
     # Windowsのエクセルを使うならエンコーディングをCP932に変えること
@@ -158,34 +72,12 @@
       template:
         # srcはtemplatesフォルダが探索パスに含まれているのでファイル名だけでよい
         # destはファイル名だけだとrole_pathからの相対パスになるので注意
-        src: show_system_info.j2
+        src: get_devices.csv.j2
         dest: "{{ _logdir + '/' + _filename + '_sysinfo.csv' }}"
         output_encoding: "{{ OUTPUT_ENCODING }}"
         newline_sequence: "{{ NEWLINE_SEQUENCE }}"
       ignore_errors: true
 
-    # Startup-config : Tue Jun 12 14:12:35 2018 config1
-    # コンフィグのバンクの情報をインベントリのhost_varsに書き出すならこうする
-    # 面倒なのでconfig1とconfig2の両方をgetしとけばいいか・・・
-    #
-    # - name: SAVE CONFIG_BANK INFO INTO HOST_VARS
-    #   delegate_to: localhost
-    #   lineinfile:
-    #     path: "{{ ansible_inventory_sources[0] + '/sir_config_bank.yml' }}"
-    #     create: true
-    #     state: present
-    #     regexp: "{{ '^' + inventory_hostname + ':\\s+\\S+' }}"
-    #     line: "{{ inventory_hostname + ': ' + _sysinfo[0].CONFIG_BANK }}"
-    #   ignore_errors: true
-    #   when:
-    #     - _sysinfo[0].CONFIG_BANK is defined
-
-
-    #
-    # stdoutはこれ以降、使わないのでメモリ削減のために空のリストに置き換えておく（気休め？）
-    #
-    - set_fact:
-        stdout: []
 
   when:
-    - stdout is defined
+    - device_list is defined

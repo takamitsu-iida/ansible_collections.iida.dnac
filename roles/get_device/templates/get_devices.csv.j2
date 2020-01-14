@@ -1,0 +1,31 @@
+{#
+ # device_listをCSV形式にするテンプレート
+ # プレイブックで
+ #  set_fact: _device_list
+ # しているのを前提にしているので、_device_list配列から情報を取り出す。
+ #
+#}
+機器,FAILED,設定差分,CURRENT_TIME,STARTUP_TIME,SYSTEM,SERIAL,ROM_VER,FIRM_VER,STARTUP_CONFIG,RUNNING_CONFIG,BANK,MAC,MEMORY,exe_id,filename
+{% set device_list=hostvars[inventory_hostname]._device_list|default([{}]) %}
+{% for device in device_list -%}
+
+{% set failed=(hostvars[host]._sysinfo_failed|default(''))|string %}
+{% set diff=hostvars[host]._diff|default('') %}
+{% set exe_id=hostvars[host]._exe_id|default('') %}
+{% set filename=hostvars[host]._filename|default('') %}
+{% set list=hostvars[host]._sysinfo|default([{}]) %}
+{% set obj=list[0] %}
+{% set CURRENT_TIME=obj.CURRENT_TIME|default('') %}
+{% set STARTUP_TIME=obj.STARTUP_TIME|default('') %}
+{% set SYSTEM=obj.SYSTEM|default('') %}
+{% set SERIAL=obj.SERIAL|default('') %}
+{% set ROM_VER=obj.ROM_VER|default('') %}
+{% set FIRM_VER=obj.FIRM_VER|default('') %}
+{% set STARTUP_CONFIG=obj.STARTUP_CONFIG|default('') %}
+{% set RUNNING_CONFIG=obj.RUNNING_CONFIG|default('') %}
+{% set CONFIG_BANK=obj.CONFIG_BANK|default('') %}
+{% set MAC=obj.MAC|default('') %}
+{% set MEMORY=obj.MEMORY|default('') %}
+{{ host }},{{ failed }},{{ diff }},{{ CURRENT_TIME }},{{ STARTUP_TIME }},{{ SYSTEM }},{{ SERIAL }},{{ ROM_VER }},{{ FIRM_VER }},{{ STARTUP_CONFIG }},{{ RUNNING_CONFIG }},{{ CONFIG_BANK }},{{ MAC }},{{ MEMORY }},{{ exe_id }},{{ filename + '.txt' }}
+
+{% endfor %}

@@ -512,10 +512,12 @@ class DnacRestClient:
         # PRE PROCESS
         #
         result = {
+          # data
+          # text
+          # msg
+          # original_message
           'failed': True,
-          'msg': '',
-          'status_code': -1,
-          'data': {}
+          'status_code': -1
         }
 
         token = self.get_token()
@@ -567,27 +569,31 @@ class DnacRestClient:
         #
 
         if r is None:
+          logger.error(result.get('original_message', ''))
           return result
 
+        # set status_code
         result['status_code'] = r.status_code
         logging.info("%s %s", r.status_code, r.url)
 
-        # remove token cache if authentication error
-        if r.status_code == 401:
-          self.save_token(None)
-          result['msg'] = "authentication error"
-          result['original_message'] = r.json()
-          return result
-
+        # extract data from response
         content_type = r.headers.get('Content-Type', '')
         if content_type.find("json") >= 0:
           result['data'] = r.json()
         else:
-          result['data'] = r.text
+          # in case of error ?
+          result['text'] = r.text
 
-        # success
         if r.ok:
+          # success
           result['failed'] = False
+        else:
+          logger.info(json.dumps(result, ensure_ascii=False, indent=2))
+
+          # remove token cache if authentication error
+          if r.status_code == 401:
+            self.save_token(None)
+            result['msg'] = "cached token is removed due to authentication error"
 
         return result
         #
@@ -595,9 +601,11 @@ class DnacRestClient:
     return _outer_wrapper
   #
 
+
   @staticmethod
   def _normalize_api_path(api_path):
     return api_path.strip('/')
+
 
   @staticmethod
   def extract_data_response(get_result):
@@ -608,6 +616,7 @@ class DnacRestClient:
     if isinstance(data, dict):
       return data.get('response')
     return None
+
 
   @set_token()
   def get(self, api_path='', params=None, **kwargs):
